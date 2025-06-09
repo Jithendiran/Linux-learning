@@ -12,6 +12,8 @@
 
 ## Todo
 * wait() (SIGCHILD)
+* clone()
+* strace
 
 ## explain
 
@@ -88,7 +90,8 @@ if (pid == 0) {
 }
 ```
 
-**Copy-On-Write**
+
+## Copy-On-Write
 
 When a process is duplicated using fork, it will use copy on write methodology. 
 *Text segment*
