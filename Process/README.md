@@ -133,4 +133,8 @@ int main() {
 
 ```
 
+## File sharing
+    Open file descriptors in parent and child share the same open file description. If child made some changes parent could see the changes.
+
+
 [Process](./Process.c) 
