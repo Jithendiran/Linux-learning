@@ -1,4 +1,7 @@
 
 This is learning repo to understand linux
 
-[Process](./Process/Process)
+## 🧭 Monthly Plan
+1. [Process (fork, wait, exit, COW)](./Process/README.md)
+2. Memory & mmap
+3. File I/O & `/proc`
