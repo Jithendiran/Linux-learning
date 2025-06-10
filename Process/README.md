@@ -11,9 +11,14 @@
 - How copy-on-write behaves in forked processes
 
 ## Todo
-* wait() (SIGCHILD)
+* zombies, orphan
+* wait()
+* SIGCHILD
 * clone()
 * strace
+* exec family
+* perror
+* debug
 
 ## explain
 
@@ -39,21 +44,36 @@ All Linux processes (except PID 0 and 1) are created using the `fork()` system c
 
 ## Termination
 To terminate a process *exit(stats)* or *_exit(status)* is used
-*exit*
-	Which will cleanup the resources and terminate the process
-	Resources in the sense, opened descriptor, stack segment, data segment, heap segment
-	Flush all the open output stream
+- `exit(status)` – user-level (libc) termination
+- `_exit(status)` – low-level (syscall) termination
+
+------
+
+### exit
+- Calls registered cleanup handlers: `atexit()` or `on_exit()`
+- Flushes all open output stream buffers (`stdout`, `stderr`, etc.)
+- Finally calls `_exit()` to exit the process
 	
-### When to use 
+#### When to use 
 	inside every process where needed termination with resource cleanup
 
->[!TIP]  
->**safe** termination: cleans up resources like file descriptors, memory, and flushes output
+> [!TIP]  
+> `exit()` = **safe termination**.  
+> Ensures complete libc cleanup, including I/O and `atexit()` routines.
 
-*_exit*
-	It does not perform cleanup task
+### _exit
+- **Bypasses all user-space cleanup**
+- Immediately terminates the process
+- OS will:
+  - Close file descriptors
+  - Release file locks
+  - Detach System V shared memory
+  - Release semaphores
+  - Unmap memory regions (`mmap`)
+  - Send `SIGHUP` to all foreground processes in the controlling terminal if needed
 
-### When to use
+#### When to use
+    simple: no cleanup needed
 	If a process is forked but failed when executing exec() function family. In this case no resources are created for child process. So at this time exit() is used means  in child process resources like file descriptor are inherited from parent process, it will flush out the buffer  and parent also use exit() it will again flush out, so two times log may print.
 	Shared memory state from parent process could lead to wired behaviour
 
@@ -90,6 +110,8 @@ if (pid == 0) {
 }
 ```
 
+when a fork is called and exec() function is called, in child process all the exit handlers are removed if any registered by `atext()` or `on_exit()`  
+if a process is terminated by signals, it don't call's exit handler by default, signal handler have to call it explicitly, however for `SIGKILL` no way to regoster signal handler, so terminate the process with `SIGTERM`
 
 ## Copy-On-Write
 
