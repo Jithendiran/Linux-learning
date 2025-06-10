@@ -11,13 +11,10 @@
 - How copy-on-write behaves in forked processes
 
 ## Todo
-* zombies, orphan
-* wait()
-* SIGCHILD
-* clone()
-* strace
 * exec family
 * perror
+* strace
+* clone()
 * debug
 
 ## explain
@@ -41,13 +38,54 @@ When you run `ls`, your shell acts as the **parent**, and `ls` is the **child**.
 All Linux processes (except PID 0 and 1) are created using the `fork()` system call, which duplicates the parent process.
 
 ---
+## wait
+- `wait(int *status)` wait till any of the child process to terminate or killed
+- `waitpid(pid_t pid, int *status, int options)` wait till specified pid to terminate, killed and signal specified in options  
+
+### pid
+
+   *  \> 0: Waits for the child with that specific PID.
+   *  = 0: Waits for any child in the same process group.
+   * < -1: Waits for any child whose process group ID is equal to the absolute value of pid.
+   * -1: Waits for any child process.
+
+### status
+ Although it is defined as int, only bottom 2bytes are taken for account
+   * The child terminated by `_exit()` or `exit()` specifies and integer 
+   * Terminated by unhandled signal
+   * Child stopped by signal and `waitpid()` called with `WUNTRACED`
+   * Child resumed by `SIGCONT` in `waitpid()`
+
+### options  
+
+   * `WUNTRACED` , return if a child has stopped (not terminated) due to a signal like SIGSTOP or Ctrl+Z.
+   * `WCONTINUED`, return if a stopped child has been resumed due to SIGCONT.
+   * `WNOHANG` , Do not block (wait); return immediately.
+
+### orphan
+when a parent process killed before, child process then child process is become orphan, it will be adapted by init (pid 1) process
+
+### zombie
+when child process is completed (exited) it's execution before parent process do `wait` for child process in this state child process become zombie, meaning all of it's resource are collected back, only process table is maintained (table recording (among other things) the child’s process ID, termination status, and resource usage statistics).
+
+If a parent creates a child, but fails to perform a wait(), then an entry for the zombie child will be maintained indefinitely in the kernel’s process table.
+the zombies can’t be killed by a signal, the only way to remove them from the system is to kill their parent (or wait for it to exit), at which time the zombies are adopted init, and init process periodically and automatically calls the wait() system call so the zombie process will be reaped.
+
+A zombie process, also known as a "defunct" process
+
+summary  
+- Zombie processes are dead but not yet reaped.
+- They can't be "killed" by signals because they already terminated.
+
+### SIGCHILD
+When a child terminates, the kernel sends SIGCHLD to its parent.
+By default, this signal does nothing.
 
 ## Termination
 To terminate a process *exit(stats)* or *_exit(status)* is used
 - `exit(status)` – user-level (libc) termination
 - `_exit(status)` – low-level (syscall) termination
 
-------
 
 ### exit
 - Calls registered cleanup handlers: `atexit()` or `on_exit()`
