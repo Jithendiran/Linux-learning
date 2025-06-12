@@ -11,11 +11,7 @@
 - How copy-on-write behaves in forked processes
 
 ## Todo
-* exec family
 * perror
-* strace
-* clone()
-* debug
 
 ## explain
 
@@ -40,6 +36,18 @@ All Linux processes (except PID 0 and 1) are created using the `fork()` system c
 `syscall : clone`
 
     create a new process
+
+Flow
+-----
+
+`fork() -> __libc_fork() -> arch_fork() -> INLINE_SYSCALL_CALL (clone, flags, 0, NULL, ctid, 0)`
+
+**User Application** : `fork()`
+
+**libc**:
+`__libc_fork()` -> `arch_fork()` -> `INLINE_SYSCALL_CALL (clone, flags, 0, NULL, ctid, 0)` 
+
+**syscall**: `INLINE_SYSCALL_CALL (clone, flags, 0, NULL, ctid, 0)`
 
 ---
 ## wait
