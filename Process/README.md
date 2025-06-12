@@ -37,10 +37,18 @@ When you run `ls`, your shell acts as the **parent**, and `ls` is the **child**.
 
 All Linux processes (except PID 0 and 1) are created using the `fork()` system call, which duplicates the parent process.
 
+`syscall : clone`
+
+    create a new process
+
 ---
 ## wait
 - `wait(int *status)` wait till any of the child process to terminate or killed
 - `waitpid(pid_t pid, int *status, int options)` wait till specified pid to terminate, killed and signal specified in options  
+
+`syscall : wait4`
+
+    Waits for child process, collects exit status
 
 ### pid
 
@@ -91,6 +99,10 @@ To terminate a process *exit(stats)* or *_exit(status)* is used
 - Calls registered cleanup handlers: `atexit()` or `on_exit()`
 - Flushes all open output stream buffers (`stdout`, `stderr`, etc.)
 - Finally calls `_exit()` to exit the process
+
+`syscall : exit_group`
+
+    used to terminate an entire process, including all of its threads.
 	
 #### When to use 
 	inside every process where needed termination with resource cleanup
@@ -198,3 +210,39 @@ int main() {
 
 
 [Process](./Process.c) 
+
+
+## exec 
+
+### 📋 Summary of Differences Between the `exec()` Functions
+
+v → argument array (char *argv[])
+
+l → argument list (const char *arg0, arg1, ..., NULL)
+
+e → explicit envp[] array
+
+p → search PATH environment variable
+
+| Function   | Specification of Program File (`-`, `p`) | Specification of Arguments (`v`, `l`) | Source of Environment (`e`, `-`)     |
+|------------|-------------------------------------------|----------------------------------------|---------------------------------------|
+| `execve()` | pathname                                  | array                                  | `envp` argument                        |
+| `execl()`  | pathname                                  | list                                   | caller’s `environ`                    |
+| `execvp()` | filename + `PATH`                         | array                                  | caller’s `environ`                    |
+| `execlp()` | filename + `PATH`                         | list                                   | caller’s `environ`                    |
+| `execv()`  | pathname                                  | array                                  | caller’s `environ`                    |
+| `execle()` | pathname                                  | list                                   | `envp` argument                        |
+
+
+During the process of exec, a process image is constructed using the segments of executable file, executable file also allows to define the interpreter (`PT_INTERP` in `ELF`). If interpreter is defined kernel constructs the process image from the segments of the specified interpreter executable file. It is then the responsibility of the interpreter to load and execute the file
+
+syscall : execve
+
+    Replaces current process image with a new one
+
+exec family is different from execve syscall, when we call execve in user space application it is called from libc, libc internally calls the syscall
+
+Programs
+----------
+[execve](./exec/execve.c)
+[execlp](./exec/execlp.c)
