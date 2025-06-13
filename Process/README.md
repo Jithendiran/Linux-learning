@@ -9,9 +9,10 @@
 - Why `wait()` is needed (zombies, orphan)
 - When to use `exit()` vs `_exit()`
 - How copy-on-write behaves in forked processes
+- exec family
+- clone basics
+- How syscall happens and how to trace system calls
 
-## Todo
-* perror
 
 ## explain
 
@@ -48,6 +49,14 @@ Flow
 `__libc_fork()` -> `arch_fork()` -> `INLINE_SYSCALL_CALL (clone, flags, 0, NULL, ctid, 0)` 
 
 **syscall**: `INLINE_SYSCALL_CALL (clone, flags, 0, NULL, ctid, 0)`
+
+visit before going to kernel flow [syscall](../debug/syscall.md)
+
+**kernel flow**
+
+`sys_clone()` -> `kernel_clone()` -> `copy_process()` -> `wake_up_new_task()`  
+`copy_process()` is allocating the resource for process  
+`wake_up_new_task()` is put the process in action
 
 ---
 ## wait
@@ -252,5 +261,30 @@ exec family is different from execve syscall, when we call execve in user space 
 
 Programs
 ----------
-[execve](./exec/execve.c)
-[execlp](./exec/execlp.c)
+[execve](./exec/execve.c)  
+[execlp](./exec/execlp.c)  
+
+## clone
+Allows fine-grained control over what is shared between parent and child through flags
+
+Process/Thread Creation Flags
+    `CLONE_VM`: Share memory space  
+    `CLONE_FS`: Share filesystem information (root, working dir)  
+    `CLONE_FILES`: Share file descriptors  
+    `CLONE_SIGHAND`: Share signal handlers  
+    `CLONE_PARENT`: Childs parent same as callers parent   
+    `CLONE_THREAD`: Place child in same thread group as parent  
+    `CLONE_SYSVSEM`: Share System V SEM_UNDO semantics  
+    `CLONE_SETTLS`: Set TLS (Thread Local Storage)  
+    `CLONE_PARENT_SETTID`: Write thread id of child into ptid
+    `CLONE_CHILD_CLEARTID`: Clear TID in child  
+
+Namespace Flags
+    `CLONE_NEWIPC`: New IPC namespace  
+    `CLONE_NEWNET`: New network namespace  
+    `CLONE_NEWNS`: Child get copy of parent's mount namespace   
+    `CLONE_NEWPID`: New PID namespace  
+    `CLONE_NEWUSER`: New user namespace  
+    `CLONE_NEWUTS`: New UTS namespace  
+
+[clone](./clone.c)  
