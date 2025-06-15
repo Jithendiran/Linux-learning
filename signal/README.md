@@ -1,0 +1,75 @@
+# Signals
+    Signal is notification to process. Most of the time kernel will send the signal to process. One process can send signal to another process.
+
+### when process get signal from kernel
+
+* Hardware exception (divide by zero, mouse click)
+* User typed signal (SIGINT, SIGKILL,..)
+* Software event become available (when a file descriptor is available, window resize, ...)
+
+
+### Classification
+
+* Traditional or standard signal (1 to 31)
+* realtime signal
+
+## Pending signal
+
+    Time between signal generation and delivery is state of pending. If a process is currently not running then signal will delivered to the process as soon as it is next scheduled for CPU
+
+## Signal mask
+
+    Some times, some part of code should not interrupt by signals, that time we can block the signal by signal mask, when a signal is sent on this time it will be in pending state till signals are unblocked
+
+## Default actions
+
+* Ignored
+* Terminated (abnormal process termination)
+* Core dump
+* Stopped
+* Resumed
+Instead of accepting the default action, process can disposition the signal with user handler
+
+> [!IMPORTANT]  
+> It is not possible to set the disposition of the signal to terminate or core dump, unless it one of these are default signal
+
+## Status
+ For the process in `/proc/{id}/status` file has the information about the signals, it is in hexa decimal format. Least bit is 1 and next is 2 like that. These fields are  
+
+SigPng  - Per thread pending signal  
+ShdPnd  - Process-wide pending signal  
+SigBlk  - Blocked signal  
+SigIgn  - Ignored signal  
+SigCgt  - Caught signal    
+
+## Types and default action
+
+Listed only few
+
+* SIGABRT    
+    When: Sent when a process calls abort().    
+    Default: terminates with core dump.    
+
+* SIGALRM  
+    When: When expiration of real-time timer  
+
+* SIGCHILD  
+    When: Parent receives the signal when one of it is child is terminated (exit() or kill by signal), stopped or resumed  
+
+* SIGCONT  
+    When: user specific  
+    Default: When on receive of this signal stopped process will resume it's execution, by default this signal is ignored  
+
+* SIGHUP  
+    When: Terminal disconnect occurs, this signal sent to controlling process os the terminal  
+    Use: For daemons when the signal is sent, daemons are reinitialize themselves  
+
+* SIGINT  
+    When: user type Control-c, terminal driver send the signal to foreground process group  
+    Default:  To terminate the process  
+
+* SIGKILL  
+    This sure kill signal, it can't be blocked, ignored or caught with handler. It always terminates the process  
+
+* SIGPIPE  
+    When: when a process tries to write to a pipe, FIFO or socker for which no corresponding reader process. This is normally occurs bacause the reading process closed the file descriptor  
