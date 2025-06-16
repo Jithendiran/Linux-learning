@@ -73,3 +73,27 @@ Listed only few
 
 * SIGPIPE  
     When: when a process tries to write to a pipe, FIFO or socker for which no corresponding reader process. This is normally occurs bacause the reading process closed the file descriptor  
+
+* SIGQUIT  
+    When: User type control + \ in terminal.
+    To whom: Sent to foreground process group
+    Default: It will  terminate the process and cause core dump
+
+> [!NOTE]  
+> We can connect core dump with GDB.  
+
+* SIGTERM    
+    When: User type control + c in terminal  
+    What: This is the standard signal to terminate the process, well designed application have a handler for this signal and do the resource cleanup  
+    Default: terminate the process
+
+* SIGUSR1 and SIGUSR2  
+    What: This is user defined signals, generally kernel don't send this type of signals   
+
+## Changing Signal disposition
+
+* signal()  
+This is simple one, no additional feature.
+
+* sigaction()  
+This is complex and feature rich
