@@ -16,6 +16,10 @@ If user application call
 
 4. Now search for function definition 
 
+>[!TIP]  
+>Instead of debug use strace to find the syscalls
+
+
 > \# grep -rn "sys_clone(" /media/Linux/linux-6.8 
 
 ```bash

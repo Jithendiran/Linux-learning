@@ -1,5 +1,6 @@
 # Signals
-    Signal is notification to process. Most of the time kernel will send the signal to process. One process can send signal to another process.
+
+Signal is notification to process. Most of the time kernel will send the signal to process. One process can send signal to another process.
 
 ### when process get signal from kernel
 
@@ -15,11 +16,11 @@
 
 ## Pending signal
 
-    Time between signal generation and delivery is state of pending. If a process is currently not running then signal will delivered to the process as soon as it is next scheduled for CPU
+Time between signal generation and delivery is state of pending. If a process is currently not running then signal will delivered to the process as soon as it is next scheduled for CPU
 
 ## Signal mask
 
-    Some times, some part of code should not interrupt by signals, that time we can block the signal by signal mask, when a signal is sent on this time it will be in pending state till signals are unblocked
+Some times, some part of code should not interrupt by signals, that time we can block the signal by signal mask, when a signal is sent on this time it will be in pending state till signals are unblocked
 
 ## Default actions
 
@@ -93,7 +94,37 @@ Listed only few
 ## Changing Signal disposition
 
 * signal()  
-This is simple one, no additional feature.
+    * This is simple one, no additional feature.
+    * It is not possible to retrieve the current disposition of a signal without at the same time changing that disposition
+
+    SYSCALL: `signal() -> __sysv_signal() -> __sigaction() -> __libc_sigaction() -> INLINE_SYSCALL_CALL (rt_sigaction, sig, ... )`  
+    **syscall**: `rt_sigaction`  
+    **Kernel syscall handler** : `sys_rt_sigaction`  
+    **Kernel implementation**: `SYSCALL_DEFINE4(rt_sigaction, int, sig, const struct sigaction __user *, act, struct sigaction __user *, oact, size_t, sigsetsize)`
+
 
 * sigaction()  
 This is complex and feature rich
+
+## kill, raise and killpg
+
+### Kill
+`int Kill(pid, sig)` is used to send a signal to a process
+
+* pid > 0, signal sent to the proccess whose pid is matched
+* pid == 0, signal sent to every process in the same process group, including the calling proces itself
+* pid < -1, signal sent to all process in the process group whose id equals the absolute value of pid
+* pid == -1, signal sent to every process for which the calling process has permission to sent (except init). If a privileged process makes this call then all process in the system will be signaled. This is sometimes called as *broadcast*
+* If no process matched `errno` set to `ESRCH`.
+* if sig is spefified as 0, no signal is sent instead check process can be signaled. If fails `errno` set to `ESRCH`
+
+**Permission**  
+* Privileged `(CAP_KILL)` can send signal to any process.  
+* Un-Privileged can send signal to other process whose `real` or `effective user ID` of *sending process* matches `real user ID` or `saved setuser ID` of the *receiving process* 
+
+### raise
+`int raise(int sig)` is used to send signal to itself. It is equal to `kill(getpid(), sig)`
+
+## killpg
+`int killpg(pgrp, sig)` send signal to all of the members of process group. It is equal to `kill(-pgrp, sig)`
+if pgrp == 0 then signal is sent to all process in the same process group as caller. 
