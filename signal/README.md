@@ -5,9 +5,61 @@ Signal is notification to process. Most of the time kernel will send the signal 
 ### when process get signal from kernel
 
 * Hardware exception (divide by zero, mouse click)
-* User typed signal (SIGINT, SIGKILL,..)
-* Software event become available (when a file descriptor is available, window resize, ...)
 
+These happen when the CPU detects an abnormal condition during process execution.
+| Condition             | Signal    | Example                      |
+| --------------------- | --------- | ---------------------------- |
+| Divide by zero        | `SIGFPE`  | `int x = 1 / 0;`             |
+| Invalid memory access | `SIGSEGV` | Dereferencing a null pointer |
+| Illegal instruction   | `SIGILL`  | Jumping to garbage memory    |
+| Bus error             | `SIGBUS`  | Misaligned memory access     |
+
+---
+* User typed signal (SIGINT, SIGKILL,..)  
+Terminal driver sends signals to the foreground process group:  
+
+| Key Combo  | Signal                           | Description        |
+| ---------- | -------------------------------- | ------------------ |
+| `Ctrl + C` | `SIGINT`                         | Interrupt          |
+| `Ctrl + \` | `SIGQUIT`                        | Quit and core dump |
+| `Ctrl + Z` | `SIGTSTP`                        | Terminal stop      |
+| `Ctrl + D` | EOF (not signal, but input ends) |                    |
+
+Signals are sent by processes explicitly via syscalls:
+
+| Function Call                      | Description                         |
+| ---------------------------------- | ----------------------------------- |
+| `kill(pid, sig)`                   | Send signal to another process      |
+| `raise(sig)`                       | Send signal to self                 |
+| `killpg(pgid, sig)`                | Send to process group               |
+| `pthread_kill(tid, sig)`           | Send to a thread in same process    |
+| `sigqueue(pid, sig, union sigval)` | Send signal with value (RT signals) |
+
+
+---
+* Software event become available (when a file descriptor is available, window resize, ...)
+Kernel can notify processes of asynchronous events:
+
+| Event                             | Signal     | Description                            |
+| --------------------------------- | ---------- | -------------------------------------- |
+| Child exits                       | `SIGCHLD`  | Sent to parent                         |
+| Timer expires (`alarm()`)         | `SIGALRM`  | Sent to process after timer ends       |
+| File descriptor ready (async I/O) | `SIGIO`    | When data is ready                     |
+| Window size changed (xterm)       | `SIGWINCH` | Window resize event                    |
+| Background write to terminal      | `SIGTTOU`  | Background process writing to terminal |
+
+---
+
+| Category         | Who Generates Signal?  | Examples                         |
+| ---------------- | ---------------------- | -------------------------------- |
+| Hardware Fault   | CPU → Kernel → Process | `SIGFPE`, `SIGSEGV`              |
+| Terminal Input   | TTY driver             | `SIGINT`, `SIGQUIT`, `SIGTSTP`   |
+| Software Syscall | Process itself         | `kill()`, `raise()`              |
+| Kernel Events    | Kernel                 | `SIGCHLD`, `SIGALRM`, `SIGWINCH` |
+| Libc / App Code  | Library or app         | `abort()`, `assert()`            |
+
+-----
+-----
 
 ### Classification
 
@@ -115,6 +167,9 @@ This is complex and feature rich
 * pid == 0, signal sent to every process in the same process group, including the calling proces itself
 * pid < -1, signal sent to all process in the process group whose id equals the absolute value of pid
 * pid == -1, signal sent to every process for which the calling process has permission to sent (except init). If a privileged process makes this call then all process in the system will be signaled. This is sometimes called as *broadcast*
+    -> Affects processes where your UID matches the real or effective UID  
+    -> Excludes process 1 (init)  
+    -> Can be dangerous if run as root  
 * If no process matched `errno` set to `ESRCH`.
 * if sig is spefified as 0, no signal is sent instead check process can be signaled. If fails `errno` set to `ESRCH`
 
@@ -131,3 +186,13 @@ if pgrp == 0 then signal is sent to all process in the same process group as cal
 
 ## Programs
 [signal](signal.c)
+
+TODO
+sigprocmask / block signals temporarily, then unblock  
+sigation  
+zombie handling with wait()  
+Reentrancy concerns  
+Trigger SIGSEGV and analyze core dump  
+Open /proc/self/status before/after masking a signal  
+sigqueue(), siginfo_t, real-time signals (SIGRTMIN..)  
+Explore delivery latency, reliability (standard vs real-time)  
