@@ -161,6 +161,7 @@ This is complex and feature rich
 ## kill, raise and killpg
 
 ### Kill
+
 `int Kill(pid, sig)` is used to send a signal to a process
 
 * pid > 0, signal sent to the proccess whose pid is matched
@@ -178,21 +179,48 @@ This is complex and feature rich
 * Un-Privileged can send signal to other process whose `real` or `effective user ID` of *sending process* matches `real user ID` or `saved setuser ID` of the *receiving process* 
 
 ### raise
+
 `int raise(int sig)` is used to send signal to itself. It is equal to `kill(getpid(), sig)`
 
-## killpg
+### killpg
+
 `int killpg(pgrp, sig)` send signal to all of the members of process group. It is equal to `kill(-pgrp, sig)`
 if pgrp == 0 then signal is sent to all process in the same process group as caller. 
 
-## Programs
+### Programs
+
 [signal](signal.c)
 
-TODO
-sigprocmask / block signals temporarily, then unblock  
-sigation  
+## Signal set
+
+Multiple signals are represented using a data structure called a signal set, provided by the system data type sigset_t.
+
+There are functions to init empty signal set, init fill signal set, add a signal to signal set, remove a signal from signal set, is a signal present in signal set
+
+## Mask
+Kernel maintain a signal set for each process, each thread to be blocked. Blocking `SIGKILL` and `SIGSTOP` is not possible. All the blocked signal will be in the pending state, when ever signal is unblocked, signals will be delivered. How ever it is actually mask, it don't count how many times the particular signal signaled, It just deliver once
+
+Using `sigprocmask` it is possible to block or unblock signals
+
+`SIG_BLOCK` - To block a set of signals  
+`SIG_UNBLOCK` - To unblock set of signals
+`SIG_SETMASK` -  To completely replace the current signal mask with a new one
+
+`sigpending` is used to retrieve all the pending signals for a process
+
+### Doubt
+if SIGCHILD, SIGUSER1, SIGUSER2 is in pending state, which signal will deliver to process as first
+
+## Program
+[mask](mask.c), [multimask](multimask.c)
+
+## Sigaction
+It is more flexible way of handling the signal. When signal is caught in handler it is automatically added to signal mask
+
+
+TODO  
 zombie handling with wait()  
 Reentrancy concerns  
 Trigger SIGSEGV and analyze core dump  
-Open /proc/self/status before/after masking a signal  
 sigqueue(), siginfo_t, real-time signals (SIGRTMIN..)  
 Explore delivery latency, reliability (standard vs real-time)  
