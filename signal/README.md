@@ -216,10 +216,13 @@ if SIGCHILD, SIGUSER1, SIGUSER2 is in pending state, which signal will deliver t
 
 ## Sigaction
 It is more flexible way of handling the signal. When signal is caught in handler it is automatically added to signal mask
+[sigaction](./sigaction.c)
 
+## Reentrant
+A function is said to be rentrant if it can safely be simultaneoulsy executed by multiple thread of execution in the same process.
+A function it employes only local variables is guarenteed to be reentrant. Even use of static variable is consider as non-reentrant
 
 TODO  
-zombie handling with wait()  
 Reentrancy concerns  
 Trigger SIGSEGV and analyze core dump  
 sigqueue(), siginfo_t, real-time signals (SIGRTMIN..)  
