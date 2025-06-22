@@ -209,18 +209,31 @@ Using `sigprocmask` it is possible to block or unblock signals
 `sigpending` is used to retrieve all the pending signals for a process
 
 ### Doubt
-if SIGCHILD, SIGUSER1, SIGUSER2 is in pending state, which signal will deliver to process as first
+if SIGCHILD, SIGUSER1, SIGUSER2 is in pending state, which signal will deliver to process as first.
+    Ans: Order is not guarenteed.
 
 ## Program
 [mask](mask.c), [multimask](multimask.c)
 
 ## Sigaction
-It is more flexible way of handling the signal. When signal is caught in handler it is automatically added to signal mask
+It is more flexible way of handling the signal. When signal is caught in handler it is automatically added to signal mask and when leaving it will remove from signal mask
 [sigaction](./sigaction.c)
 
 ## Reentrant
 A function is said to be rentrant if it can safely be simultaneoulsy executed by multiple thread of execution in the same process.
 A function it employes only local variables is guarenteed to be reentrant. Even use of static variable is consider as non-reentrant
+
+## exit
+It is possible to exit the signal handler with `_exit`, performing `goto`, `longjump` when performing jump or goto depends on the methods we are calling the signal is unmasked.
+
+## Alternative stack
+When a process attempts to grow it's stack beyond the maximum possible size, the ketnel generates a `SIGSEGV` for the process.
+* Allocate a memory for alternative stack
+* Use `sigaltstack` syscall to inform kernel about alternative signal stack.
+* When establishing a signal handler specify `SA_ONSTACK` flag to tell the kernel, stack for this handler should be created alternatively
+
+## AS_SIGINFO
+It is used to obtain additional information when signal is delivered, when this flag is used, handler will looks like `void handler(int sig, siginfo_t *siginfo, void *ucontext)`
 
 TODO  
 Reentrancy concerns  
