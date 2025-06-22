@@ -106,7 +106,7 @@ Listed only few
 * SIGALRM  
     When: When expiration of real-time timer  
 
-* SIGCHILD  
+* SIGCHLD  
     When: Parent receives the signal when one of it is child is terminated (exit() or kill by signal), stopped or resumed  
 
 * SIGCONT  
@@ -125,7 +125,7 @@ Listed only few
     This sure kill signal, it can't be blocked, ignored or caught with handler. It always terminates the process  
 
 * SIGPIPE  
-    When: when a process tries to write to a pipe, FIFO or socker for which no corresponding reader process. This is normally occurs bacause the reading process closed the file descriptor  
+    When: when a process tries to write to a pipe, FIFO or socket for which no corresponding reader process. This is normally occurs bacause the reading process closed the file descriptor  
 
 * SIGQUIT  
     When: User type control + \ in terminal.
@@ -209,7 +209,7 @@ Using `sigprocmask` it is possible to block or unblock signals
 `sigpending` is used to retrieve all the pending signals for a process
 
 ### Doubt
-if SIGCHILD, SIGUSER1, SIGUSER2 is in pending state, which signal will deliver to process as first.
+if SIGCHILD, SIGUSR1, SIGUSR2 is in pending state, which signal will deliver to process as first.
     Ans: Order is not guarenteed.
 
 ## Program
@@ -235,8 +235,36 @@ When a process attempts to grow it's stack beyond the maximum possible size, the
 ## AS_SIGINFO
 It is used to obtain additional information when signal is delivered, when this flag is used, handler will looks like `void handler(int sig, siginfo_t *siginfo, void *ucontext)`
 
+## Restart system call
+Consider the scenario   
+1. Handler is established for signal.  
+2. Make a blocking system call, for example `read` from a terminal device. Which blocks till input is supplied.
+3. When system call is blocked, signal is delivered to a process. Here disposition handler will be called once the call is returned to main code. System call will be failed with eror code `EINTR`.
+
+* Some times even without custom handler for some signals `(SIGSTOP, SIGSTP,.. SIGCONT)`, blocked system call will throw an `EINTR` error when signal is delivered.
+* When read is blocking at the time signal is delivered, here read has partial data here instead of fail with `EINTR`. read will return the so far available data.  
+
+## Reentrancy 
+
+A function is **reentrant** if it can be safely invoked by multiple threads or from signal handlers without causing data corruption.  
+It must not:
+- use static or global variables
+- modify shared memory without synchronization
+- rely on standard I/O buffers
+
+Use only **async-signal-safe** functions in handlers. Refer: `man 7 signal-safety`.
+
 TODO  
-Reentrancy concerns  
+  
 Trigger SIGSEGV and analyze core dump  
+int *p = NULL;
+*p = 42;  // causes SIGSEGV
+
 sigqueue(), siginfo_t, real-time signals (SIGRTMIN..)  
 Explore delivery latency, reliability (standard vs real-time)  
+
+sigqueue() with siginfo_t
+
+Raise core dump with SIGSEGV, inspect with gdb
+
+Test signal queuing with real-time signals (SIGRTMIN+N)
