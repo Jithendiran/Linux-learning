@@ -66,6 +66,8 @@ Kernel can notify processes of asynchronous events:
 * Traditional or standard signal (1 to 31)
 * realtime signal
 
+# Standard signal
+
 ## Pending signal
 
 Time between signal generation and delivery is state of pending. If a process is currently not running then signal will delivered to the process as soon as it is next scheduled for CPU
@@ -253,6 +255,20 @@ It must not:
 - rely on standard I/O buffers
 
 Use only **async-signal-safe** functions in handlers. Refer: `man 7 signal-safety`.
+
+# Realtime signal
+Readtime signal is introduced later for the limitations of standard signals
+* Realtime signal provides a increased range of signals for user-application purpose where as standard signal provides only `SIGUSR1`, `SIGUSR2`
+* Realtime signals are queued, so same signal can deliver multiple times
+* Realtime signals can specifies a data
+* Order of delivery is guarenteed. If multiple realtime signals are pending lowest number will sent first. When multiple same number of signals are queued, they delivered in the order of they were sent
+
+`sigqueue(pid, sig, data)`
+
+To send signal with data use `sigqueue()`, it is also possible to use `kill()`, `killpg()` and `raise()`  
+unlike `kill()` it is not prossible for `sigqueue()` to send signal to entire process group by specifying negative pid.
+
+The data sent with signal can be int or pointer
 
 TODO  
   
