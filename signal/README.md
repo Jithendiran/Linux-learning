@@ -270,17 +270,17 @@ unlike `kill()` it is not prossible for `sigqueue()` to send signal to entire pr
 
 The data sent with signal can be int or pointer
 
+If signals are blocked, when unblocked it will delivered in reverse order. If more than 1 same sig found then it will be deliver in the order od sent
+
+## program
+[realtime](./realtime.c), [realtime_signal](./realtime_signal.c)
+
 TODO  
   
 Trigger SIGSEGV and analyze core dump  
 int *p = NULL;
 *p = 42;  // causes SIGSEGV
 
-sigqueue(), siginfo_t, real-time signals (SIGRTMIN..)  
 Explore delivery latency, reliability (standard vs real-time)  
 
-sigqueue() with siginfo_t
-
 Raise core dump with SIGSEGV, inspect with gdb
-
-Test signal queuing with real-time signals (SIGRTMIN+N)
