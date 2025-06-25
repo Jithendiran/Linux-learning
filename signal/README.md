@@ -275,12 +275,50 @@ If signals are blocked, when unblocked it will delivered in reverse order. If mo
 ## program
 [realtime](./realtime.c), [realtime_signal](./realtime_signal.c)
 
-TODO  
-  
-Trigger SIGSEGV and analyze core dump  
-int *p = NULL;
-*p = 42;  // causes SIGSEGV
+## additional info
 
-Explore delivery latency, reliability (standard vs real-time)  
+### pause()
+Blocks program until any one of the signal arrives
 
-Raise core dump with SIGSEGV, inspect with gdb
+### sigsuspend()
+Temporarily replaces the signal mask and suspends the process until a signal is delivered.
+It is like replacement for `pause()`. Suspends until a signal not masked arrives
+[suspend](./suspend.c)
+
+
+### sigwaitinfo() / sigtimedwait()
+Synchronously waits for signals and optionally retrieves info about them (like sigqueue() values).  
+Instead of using handlers, this lets you pull signals from a signal queue. It  retrieves it synchronously
+
+```c
+// Block the signal (prevent async delivery)
+sigset_t block;
+sigemptyset(&block);
+sigaddset(&block, SIGUSR1);
+sigprocmask(SIG_BLOCK, &block, NULL);
+
+// Now wait for signal SIGUSR1
+siginfo_t info;
+sigwaitinfo(&block, &info);  // This wait and  consumes SIGUSR1
+```
+
+### signalfd()
+Creates a file descriptor that reads signals like data. Best for event loops or poll/select systems.
+
+[filedesc](./filddes.c)
+
+
+## Child clean up
+* Case 1: Parent handles SIGCHLD with wait(). [Zombie cleanup](./zombie_cleanup.c)
+* Case 2: Parent ignores SIGCHLD  
+    When a child process terminates. Child becomes a zombie until its parent calls wait().  
+    Zombie = process is dead but still in the process table (just exit status and accounting info).  
+    If the parent never calls wait(), the zombie remains → resource leak.  
+
+    Handle
+    ----------
+    Option 1: Use signal(SIGCHLD, SIG_IGN). The kernel won’t create a zombie. No need to call wait(). [zombie_cleanup2](./zombie_cleanup2.c)  
+
+    Option 2: Use sigaction() with SA_NOCLDWAIT. SA_NOCLDWAIT tells the kernel: “Don’t keep child exit status; clean it up automatically.” [zombie_cleanup3](./zombie_cleanup3.c)  
+            
+* Case 3: Parent exits before child,  Child becomes orphan, adopted by init. init periodically calls wait() and reaps the child.
