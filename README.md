@@ -9,4 +9,5 @@ This is learning repo to understand linux
 
 ## Debug
 * [glib](./debug/glib.md)
-* [syscall_map](./debug/syscall.md)
+* [syscall_map](./debug/syscall.md)  
+* [coredump_gdb](./debug/coredump.md)  
