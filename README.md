@@ -4,7 +4,7 @@ This is learning repo to understand linux
 ## 🧭 Plan
 1. [Process (fork, wait, exit, COW)](./Process/README.md)
 2. [Signal](./signal/README.md)
-3. Memory & mmap
+3. [Memory & mmap](./memory/README.md)
 4. File I/O & `/proc`
 
 ## Debug
