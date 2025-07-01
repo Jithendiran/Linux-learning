@@ -6,6 +6,7 @@ Informations in file are:
 Format of the program. Widely used formats are in olden days `a.out(assembler output)` and  `COFF(Common Object File Format)`. Now a days `ELF(Executable and Linking Format)`.
 
 `file ./a.out`
+
 **Machine instructions**:
 
 Contains compiled machine code (.text section). CPU executes this code when the process runs.  
@@ -49,6 +50,9 @@ List of shared libraries that the program needs at run time and the pathname of 
 
 `readelf -d a.out` for loader and `readelf -S a.out` for linker
 
+dynamic link info `ldd ./a.out` To list shared libraries the program will load.
+
+
 **Other information**:
 Other information to describe the construction of a process
 
@@ -89,6 +93,7 @@ Stack memory for a function call consists of function arguments, (automatic vari
 This is dynamically allocated memory at run time. The top end of the heap is called `program break`.
 
 size command displays the size of text, initialized data and uninitialized segments
+`size a.out`
 
 ### diagram
 ![virtual memory](./res/memory_layout.png)
@@ -98,3 +103,6 @@ extern char etext;  // etext -> address of end of the program text/ start of the
 extern char edata;  // edata -> end of the initialized data segment
 extern char end;    // end   -> end of yhe uninitilized data segment
 ```
+
+### program
+[layout](layout.c), [stack_overflow](stack_overflow.c)
