@@ -106,3 +106,45 @@ extern char end;    // end   -> end of yhe uninitilized data segment
 
 ### program
 [layout](layout.c), [stack_overflow](stack_overflow.c)
+
+## Virtual Memory
+The aim of virtual memory is to efficiently use both the CPU and RAM.
+
+A virtual memory scheme splits the memory used by each program into small, fixed-size units called `pages` (typically 4096 or 8192 bytes). Physical RAM is divided into a series of `page frames` of the same size.
+
+At any point in time, only some of a program’s pages need to be in RAM; the rest can be kept in swap (disk storage). When RAM is full, the kernel may swap out unused pages to disk to make room for active ones.
+
+When a process tries to access a page that is not in RAM, a `page fault` occurs. The kernel suspends the process, loads the required page from disk into RAM, and then resumes execution.
+
+To support virtual memory, the kernel maintains a `page table` for each process. Each page table entry maps a virtual address to a physical address (or indicates if the page is on disk). If a process accesses a memory address with no valid page table entry, the kernel raises a `SIGSEGV` signal (segmentation fault). The range of valid virtual addresses for a process can change during its lifetime.
+
+Virtual memory pages are contiguous in the virtual address space, but the corresponding physical memory may not be contiguous.
+
+A dedicated hardware component, the PMMU (Paged Memory Management Unit), translates virtual addresses to physical addresses and notifies the kernel of page faults.
+
+### Virtual memory advantage
+* Process isolation: Each process is isolated from others, so one program cannot read or modify another’s memory.
+* Page protection: Each page can have its own permissions (read, write, execute, or combinations).
+* Contiguous virtual space: Processes see a contiguous range of memory, even if physical memory is fragmented.
+* Efficient memory usage: Not all parts of a process need to be loaded into RAM at once.
+* Shared memory: The kernel can map the same physical page into multiple processes’ address spaces (e.g., shared libraries, shared memory regions).
+    - The text segment of a process is typically mapped read-only and can be shared across processes.
+    - Processes can use the mmap system call to request shared memory regions.
+
+### Page Fault
+* A page fault is a hardware event that occurs when a process tries to access a virtual memory page that is not currently mapped to physical RAM.
+* The CPU notifies the kernel (via the MMU) when this happens.
+* The kernel then decides what to do:
+    - If the access is valid (e.g., the page is just swapped out or needs to be allocated), the kernel loads the page into RAM and resumes the process. This is a handled page fault.
+    - If the access is invalid (e.g., accessing an unmapped or protected region), the kernel cannot resolve it.
+
+### SIGSEGV
+* SIGSEGV (Segmentation Fault) is a signal sent by the kernel to a process when it tries to access memory in a way that is not allowed (e.g., invalid address, writing to read-only memory, accessing unmapped memory).
+* This usually happens when a page fault cannot be handled by the kernel (i.e., the memory access is truly invalid).
+
+#### Summary
+* Every SIGSEGV is caused by a page fault, but not every page fault results in a SIGSEGV.
+* Only unresolvable page faults (invalid access) cause a SIGSEGV.
+* Handled page faults (e.g., demand paging, stack growth) are transparent to the process.
+
+Working: page fault -> if valid memory loads or allocate else raise SIGSEGV
