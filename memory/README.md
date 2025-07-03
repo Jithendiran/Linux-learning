@@ -148,3 +148,35 @@ A dedicated hardware component, the PMMU (Paged Memory Management Unit), transla
 * Handled page faults (e.g., demand paging, stack growth) are transparent to the process.
 
 Working: page fault -> if valid memory loads or allocate else raise SIGSEGV
+
+## Stack memory
+
+Stack memory is mainly used for function calls. When a function is called, a new stack frame is created on the stack for that call. This frame contains the function's arguments, local variables, return address, and saved CPU registers.
+
+When a function calls another function, certain CPU registers are saved in the stack frame. When the call returns, these registers are restored.
+
+The stack starts at a high memory address and grows downward (toward lower addresses) as new frames are added. The stack pointer register (`rsp` on x86_64) tracks the top of the stack.
+
+Each thread in a process has its own stack. The kernel also maintains a separate stack for its own execution for each process or thread.
+
+If the stack grows beyond its allocated region (for example, due to deep or infinite recursion), a stack overflow occurs, typically resulting in a segmentation fault (`SIGSEGV`).
+
+## Heap memory
+
+When a program needs memory at run time, it uses heap to allocate memory.
+Heap memory is start right after  uninitialized data segments and grows and shrinks as memory allocated and freed. The current limit of the heap is refered as `program break`
+
+Allocating and deallocating heap memory is simple as adjusting the program break. When there is no heal memory allocated program break is pointed as the same location as `extern char *end`.
+
+After the program break is increased, process can access address in the nemwly allocated area, but no physical memory pages is created, kernel will automatically create the pages on the first attempt by the process to access those pages
+
+system calls used to adjust the program breaks are `brk(void *end_data_seg)` and `sbrk(intptr_t increment)`
+
+brk -> Sets the program break to location specified by end_data_seg, Since virtual memory are allocated as pages, end_data_seg is effectively rounded up to the next boundry
+
+sbrk -> Sets the program break by increment fashion. sbrk will return the previous address of the program break.
+sbrk(0) will return current location of program break
+
+pgms  
+view physical memory  
+view page table where virtual memory and physical memory is mapped
