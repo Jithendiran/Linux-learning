@@ -72,7 +72,7 @@ It is shared segment so that many process can use same text segment
 **initialized data segment (data)**  
 
 Contains initialized static and global variable. 
-The vales are read from executable file when the program is loaded into memory
+The values are read from executable file when the program is loaded into memory
 
 **uninitialized data segment (bss)** 
 
@@ -81,7 +81,7 @@ Before starting the program system initilize the values to 0
 
 why initialized and uninitialized are stored differently?
 
-Executable file no need to allocate memory for uninitialized memory. Instead it just record the size and location of the memory. Memory is allocated ate run time by loader
+Executable file no need to allocate memory for uninitialized memory. Instead it just record the size and location of the memory. Memory is allocated at run time by loader
 
 **stack**
 
@@ -101,7 +101,7 @@ size command displays the size of text, initialized data and uninitialized segme
 ```c
 extern char etext;  // etext -> address of end of the program text/ start of the initialized data
 extern char edata;  // edata -> end of the initialized data segment
-extern char end;    // end   -> end of yhe uninitilized data segment
+extern char end;    // end   -> end of the uninitilized data segment
 ```
 
 ### program
@@ -163,19 +163,52 @@ If the stack grows beyond its allocated region (for example, due to deep or infi
 
 ## Heap memory
 
-When a program needs memory at run time, it uses heap to allocate memory.
-Heap memory is start right after  uninitialized data segments and grows and shrinks as memory allocated and freed. The current limit of the heap is refered as `program break`
+When a program needs memory at run time, it uses the heap to allocate memory.
+Heap memory starts right after the uninitialized data segment (BSS) and grows or shrinks as memory is allocated and freed. The current limit of the heap is referred to as the `program break`.
 
-Allocating and deallocating heap memory is simple as adjusting the program break. When there is no heal memory allocated program break is pointed as the same location as `extern char *end`.
+Allocating and deallocating heap memory is done by adjusting the program break. When no heap memory is allocated, the program break points to the same location as `extern char *end` (the end of the BSS segment).
 
-After the program break is increased, process can access address in the nemwly allocated area, but no physical memory pages is created, kernel will automatically create the pages on the first attempt by the process to access those pages
+After the program break is increased, the process can access addresses in the newly allocated area, but no physical memory pages are created immediately. The kernel will automatically allocate physical pages on the first attempt by the process to access those addresses (this is called demand paging).
 
 system calls used to adjust the program breaks are `brk(void *end_data_seg)` and `sbrk(intptr_t increment)`
 
 brk -> Sets the program break to location specified by end_data_seg, Since virtual memory are allocated as pages, end_data_seg is effectively rounded up to the next boundry
 
-sbrk -> Sets the program break by increment fashion. sbrk will return the previous address of the program break.
+sbrk -> Moves the program break by a specified increment. sbrk(0) returns the current location of the program break.
 sbrk(0) will return current location of program break
+
+### malloca and free
+
+#### malloc
+
+malloc and related functions are used to allocate and deallocate memory on the heap. These have several advantages over brk and sbrk:
+
+- malloc is a standard C library function.
+- It can be used to allocate any small or large unit of memory.
+- Memory returned by malloc is always aligned on a byte boundary suitable for any C data structure (typically 8 or 16 bytes).
+
+To allocate memory, malloc first checks its free list. If the required memory is not available, it requests more memory from the system (using brk, sbrk).
+
+When memory is allocated, malloc actually allocates extra bytes at the beginning of each block to store the size of the block. The address returned to the caller points just past this length value
+
+#### free
+free deallocates a block of memory previously allocated by malloc.
+- free does not immediately lower the program break. Instead, it adds the block to a list of free blocks that can be recycled by future allocations.
+- Because the block to be freed may be in the middle of the heap, it is not always possible to adjust the program break. If many small contiguous blocks at the top end are freed, they may be combined and the program break lowered.
+- free may call sbrk to lower the program break only when the free blocks at the top end are sufficiently large.
+
+free will deallocate the block of memory which is allocated by malloc. free don't lower the page break. Instead it adds the block of memory to a list of free blocks that are recycled by future calls. Because the block of memory to be freed may be in the middle so it is not possible to adjust the page break, if a many small continous blocks are freed then all are combined to form a large single block
+free calls sbrk to lower the page break only when the free blocks at the top end is sufficiently large.
+
+When a process terminates, all of its memory (including heap memory) is returned to the system, even if free was not called.
+
+### Dynamic memory in stack
+
+It is possible to allocate dynamic memory at stack during run time using `alloca()` function, This is possible because the calling function is in the top of the stack, just by simply moving stack pointer we can get memory.
+
+We should not call `free` for memory allocated by alloca function. It is not possible to use realloc
+
+We can't use alloca in function arguments `func(x, alloca(size));`, This is wrong
 
 pgms  
 view physical memory  
