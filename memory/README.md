@@ -149,6 +149,62 @@ A dedicated hardware component, the PMMU (Paged Memory Management Unit), transla
 
 Working: page fault -> if valid memory loads or allocate else raise SIGSEGV
 
+## Page table
+A page table stores the mapping between virtual memory and physical memory. In linux `/proc/self/pagemap` will give you the page table
+
+On a 64-bit system, the page size is typically 4096 bytes (4KB), and the virtual address space is 64 bits wide.
+
+To find no of possible pages:  
+1. Each page is 4096 bytes = 2^(12) bytes. 
+    
+    For example, addresses 0x0000 to 0x0FFF are in the first page; only the starting address of each page is stored.
+
+2. The total number of unique virtual address is 2^(64).  
+
+3. Number of pages = total address space / page size
+
+    = 2^(64) / 2^(12)
+    = 2^(52)
+
+So, there are `2^(52) possible pages in a 64-bit` address space with 4KB pages.
+
+If each page were 1 byte instead of 4096 bytes, there would be 2⁶⁴ pages, but that is not the case.
+
+With 2^(52) pages, the file is extremely large (even if most of it is sparse and not physically stored). 
+Most entries are zero because most of the virtual address space is not mapped. 
+Catting the whole file will appear to hang or do nothing, because it's outputting mostly zeros (NUL bytes) and is extremely large.  
+It's a binary file, not text, so outputting it to a terminal is not useful.  
+
+The correct way to use `/proc/PID/pagemap`:
+1. Find the virtual address you care about (e.g., from /proc/PID/maps).
+2. calculate the offset (virtual_address / page_size) * 8 :  
+    - Divide the virtual address by the page size (e.g., 4096) to get the page number.  (virtual_address / page_size)  
+    - Multiply the page number by 8 (the size of each entry) to get the byte offset in the pagemap file.  
+3. Seek to that offset and read 8 bytes to get the pagemap entry for that page.  
+
+Example:
+
+Assume page size is 8 bytes (for illustration), and a 64-bit virtual memory address. The table would look like:
+        0: [0 - 7]
+        1: [8 - 15]
+        2: [16 - 23]
+        ....
+If the virtual address is 2, page size is 8 bytes:  
+2 / 8 = 0 → virtual address 2 is in the 0th entry.
+
+If the virtual address is 12, page size is 8 bytes:
+12 / 8 = 1 → 1st entry.
+
+To get the starting address, multiply the entry index by the entry size (8 bytes, since each entry is 64 bits).
+0th entry: 0 * 8 = 0
+1st entry: 1 * 8 = 8
+
+[refer](https://www.kernel.org/doc/Documentation/vm/pagemap.txt)
+
+#### program
+[page_table](./pagetable.c)
+
+
 ## Stack memory
 
 Stack memory is mainly used for function calls. When a function is called, a new stack frame is created on the stack for that call. This frame contains the function's arguments, local variables, return address, and saved CPU registers.
@@ -213,3 +269,163 @@ We can't use alloca in function arguments `func(x, alloca(size));`, This is wron
 pgms  
 view physical memory  
 view page table where virtual memory and physical memory is mapped
+
+
+
+
+📅 Week 1: Process Memory Layout & Virtual Memory Basics
+
+| Focus                        | Topics Covered                                                 |
+| ---------------------------- | -------------------------------------------------------------- |
+| ✅ Intro to virtual memory    | Virtual vs physical, MMU, page tables                          |
+What is a heap chunk?               How glibc manages heap, Fragmentation, double free
+| ✅ Learn lazy allocation      | `malloc()` ≠ allocation, use `/proc/self/status`, `Vm*` fields |
+| ✅ Tools                      | ltrace ./a.out `vmstat`, `pmap`, `/proc/self/*`, `gdb`                        |
+
+Mini Demos
+
+
+Stack overflow and guard page trigger
+
+📅 Week 2: mmap(), mprotect(), and File Mapping
+| Focus                        | Topics Covered                           |
+| ---------------------------- | ---------------------------------------- |
+| ✅ mmap()                     | Anonymous, file-backed, shared/private   |
+munmap()
+| ✅ mprotect()                 | Set RWX on memory    (MAP_PRIVATE, MAP_SHARED, etc.)                     |
+| ✅ Access violation & SIGSEGV | Trigger, handle, debug                   |
+| ✅ Page fault theory          | Demand paging, page faults               |
+| ✅ Tools                      | `strace`, `objdump -h`, `/proc/PID/maps` |
+Mini Projects
+
+Map a text file to memory with mmap(), read and modify
+
+Modify it with MAP_SHARED and observe persistence
+
+Show copy-on-write with MAP_PRIVATE
+
+Show mprotect() usage and trigger SIGSEGV
+
+📅 Week 3: ELF Internals & Executable Memory Mapping
+| Focus                        | Topics Covered                                             |
+| ---------------------------- | ---------------------------------------------------------- |
+| ✅ ELF binary layout          | Sections vs Segments (`.text`, `.data`, `.bss`, `.rodata`) |
+| ✅ Use `readelf`, `objdump`   | Program headers (for loader), section headers (for linker) |
+| ✅ ELF → Memory mapping       | How ELF segments are mapped into memory via `mmap()`       |
+| ✅ Linker/Loader basics       | Dynamic linker, PT\_INTERP, ld.so, GOT/PLT                 |
+| ✅ Static vs dynamic binaries | Analyze with `ldd`, `readelf -d`, `objdump -R`             |
+Mini Projects
+
+Load a small ELF manually using mmap() (read-only)
+
+Trace program startup using strace and LD_DEBUG
+
+Compare static vs dynamic executable size & startup
+
+📅 Week 4: Advanced Topics: Demand Paging, Lazy Mapping, Real-Time SIGSEGV Handling
+| Focus                         | Topics Covered                                              |
+| ----------------------------- | ----------------------------------------------------------- |
+| ✅ Lazy page allocation        | Pages are not allocated on `malloc()`, only on access       |
+| ✅ Demand mapping via SIGSEGV  | Setup `sigaction()` with `SA_SIGINFO`                       |
+| ✅ Manual memory loading       | Allocate empty region, `mprotect`, on SIGSEGV load contents |
+| ✅ Reentrant-safe signal usage | Handler safety, `sig_atomic_t`, async-signal-safe functions |
+| ✅ Shared memory (intro only)  | Use of `mmap()` with `MAP_SHARED`, not `shmget` yet         |
+
+Mini Projects
+
+Custom loader: Allocate memory and load text file on-demand when SIGSEGV occurs
+
+Dynamically grow stack on access
+
+Watch memory behavior with /proc/self/smaps, and memory pressure with vmstat
+
+ Bonus / Optional (Add if time remains):
+🔸 brk() vs mmap() memory allocation
+
+🔸 Heap growth via sbrk() — legacy but useful to understand
+
+🔸 Implement mini malloc with mmap()
+
+🔸 Read /proc/PID/smaps and estimate RSS, shared/private memory
+
+🔸 Understand huge pages (THP)
+
+🧩 1. Process Memory Layout
+Code (text), Data, BSS, Heap, Stack
+
+Use /proc/<pid>/maps to visualize memory layout
+
+Identify regions: file-backed vs anonymous
+
+What is ELF’s role in memory mapping
+
+🧠 2. Virtual Memory & Paging
+What is virtual memory? Why abstraction?
+
+How address translation works (conceptually)
+
+What is a page? (typically 4 KB)
+
+Demand paging, page faults, and lazy loading
+
+🔍 3. mmap() Internals
+What mmap() does at the system level:
+
+File-backed memory mapping (e.g. .so, images)
+
+Anonymous memory mapping (heap-like regions)
+
+Flags & Protections:
+
+MAP_SHARED vs MAP_PRIVATE (COW behavior)
+
+PROT_READ, PROT_WRITE, PROT_EXEC, PROT_NONE
+
+Mapping partial files, aligned memory
+
+munmap() to free memory manually
+
+🧪 4. Memory Protection (mprotect)
+How to mark memory regions read-only or inaccessible
+
+Catching segmentation faults with SIGSEGV
+
+Guard pages, memory corruption protection
+
+Security: exploit mitigation via memory protection
+
+🔁 5. Copy-on-Write Behavior
+How fork() and mmap(MAP_PRIVATE) use COW
+
+Detecting when a page gets copied (via strace, /proc)
+
+Use cases: performance optimization, snapshotting
+
+⚠️ 6. Segmentation Fault Debugging
+Stack overflow via recursion
+
+Accessing read-only or unmapped memory
+
+Use core dumps + gdb to trace faults
+
+Recognize common memory corruption symptoms
+
+🧬 7. Advanced Concepts
+Memory-mapped I/O (e.g. /dev/mem)
+
+Allocating large pages (MAP_HUGETLB)
+
+Locking memory in RAM (mlock())
+
+Creating executable memory regions (JIT)
+
+🛠 8. Practical Debugging Tools
+strace, pmap, vmstat, top, valgrind
+
+/proc/<pid>/maps, /proc/<pid>/smaps
+
+Use perf or page-fault counters
+
+Understand how memory leaks or fragmentation happen
+
+Address Space Layout Randomization (ASLR) 
