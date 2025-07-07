@@ -217,6 +217,8 @@ Each thread in a process has its own stack. The kernel also maintains a separate
 
 If the stack grows beyond its allocated region (for example, due to deep or infinite recursion), a stack overflow occurs, typically resulting in a segmentation fault (`SIGSEGV`).
 
+The guard page is an unmapped region placed at the end of the stack to catch stack overflows. Accessing the guard page triggers a page fault that the kernel cannot handle, resulting in a SIGSEGV (segmentation fault).
+
 ## Heap memory
 
 When a program needs memory at run time, it uses the heap to allocate memory.
@@ -224,7 +226,23 @@ Heap memory starts right after the uninitialized data segment (BSS) and grows or
 
 Allocating and deallocating heap memory is done by adjusting the program break. When no heap memory is allocated, the program break points to the same location as `extern char *end` (the end of the BSS segment).
 
-After the program break is increased, the process can access addresses in the newly allocated area, but no physical memory pages are created immediately. The kernel will automatically allocate physical pages on the first attempt by the process to access those addresses (this is called demand paging).
+After the program break is increased, the process can access addresses in the newly allocated area, but no physical memory pages are created immediately. The kernel will automatically allocate physical pages on the first attempt by the process to access those addresses (this is called demand paging). It can be verified using `cat /proc/self/status | grep Vm`, after dynamic memory allocation `VmSize` will be increased, But `VmRSS` will not increase until you actually write to the memory
+
+```
+Field	Meaning
+VmPeak	Peak virtual memory size (maximum VmSize reached)
+VmSize	Current total virtual memory size (all mapped regions)
+VmLck	Locked memory size (pages locked in RAM, not swappable)
+VmPin	Pinned memory size (pages that can't be moved, e.g., for DMA)
+VmHWM	Peak resident set size ("high water mark" of VmRSS)
+VmRSS	Resident Set Size (actual physical memory currently in RAM)
+VmData	Size of data segment (heap + uninitialized data, i.e., malloc/brk/sbrk)
+VmStk	Stack size
+VmExe	Size of text segment (executable code)
+VmLib	Shared library code size
+VmPTE	Page Table entries size
+VmSwap	Swapped-out virtual memory size
+```
 
 system calls used to adjust the program breaks are `brk(void *end_data_seg)` and `sbrk(intptr_t increment)`
 
@@ -265,3 +283,6 @@ It is possible to allocate dynamic memory at stack during run time using `alloca
 We should not call `free` for memory allocated by alloca function. It is not possible to use realloc
 
 We can't use alloca in function arguments `func(x, alloca(size));`, This is wrong
+
+### Program
+[lazy_alloc](lazy_alloc.c)
