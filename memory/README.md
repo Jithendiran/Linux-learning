@@ -286,3 +286,71 @@ We can't use alloca in function arguments `func(x, alloca(size));`, This is wron
 
 ### Program
 [lazy_alloc](lazy_alloc.c)
+
+## mmap
+
+`mmap` system call creates a new memory mapping in the calling process's virtual address space.
+The mapping can be two types
+* **File Mapping or memory mapped file** :
+    Maps a region of file directly into the process virtual address. File content is accessed in the byte order in corresponding to the memory region.  
+
+* **Anonymous mapping**
+    It doesn't have a file to map, instead the pages are initilized to 0
+
+Mappings can be **private** or **shared**:
+
+* **shared(`MAP_SHARED`)** :
+    The mapped memory can be shared between processes. The page table entries of each process point to the same physical pages in RAM. Changes made by one process are visible to others.
+
+* **parivate(`MAP_PRIVATE`)**:
+    Modifications are not visible to the other process, the operations are not carried to the underlying files when it is in private
+
+When a process calls fork(), both the parent and child initially share the same memory region if it is MAP_PRIVATE. If either process modifies the memory, a new private copy is created for that process (copy-on-write).  Private region is some times called as `copy-on-write mapping`
+
+
+There are four types of mapping can be created
+1. **private file mapping**:
+
+    The content of the mapping initilized from a file, multiple process mapping the sane file initially share the same physical pages, later copy-on-write is employed and changes are not visible to other process
+
+2. **Private anonymous mapping**:
+
+    It creates a distant memory for the process, when subprocess is created using `fork` copy-on-write ensure's changes made by one process is not visible to other. It's conent are initilized to 0
+
+3. **shared file mapping**:
+
+    All process mapped the same region of a file share the same physical pages of memory. Modifications are carried through the file.
+    It's uses 
+    - memory-mapped IO (File is loaded into a region of the process virtual memory and modifications are automatically written to the file). It is the alternative for `read` and `write`
+    - Inter Process Communication for two unrelated process
+
+4. **shared anonymous mapping**:
+
+    It creates a distant memory, when a child process is created using fork it will not employ copy-on-write. The changes made by one process is visible to other
+    It's used
+    -Inter Process Communication for two related process 
+
+### Memory protection for mmap
+These are the page protection flags
+`PORT_NONE` - The resgion is not accessed.  
+              This is used for page gaurd, like before and after of stack. if user trying to access, it cause violation
+`PORT_READ` - The content of region can be read
+`PORT_WRITE`- The content of region can be modified
+`PORT_EXEC` - The content of region can be executed
+
+If write to read only region or, execution of write and read region or access of PORT_NONE,.. cause violation. It raise `SIGSEGV` signal, In some linux `SIGBUS` is used
+
+The memory protection reside in process-private virtual memory tables. Thus different process may map the same region with different protections.  
+Memory protection can be changed using `mprotect()`
+
+### munmap
+`munmap` system call removing a mapping from the calling process virtual address space.
+During munmap, kernel removes any memory locks that the process holds for specified address range.
+All the process mapping are unmapped when process terminates or performs an `exec`
+
+To ensure the cotent of the shared file mapping are written to the underlying file, a call to `msync()` should be made before munmap
+
+### program
+[mmap](./mmap.c)
+
+When a process executes `exec()` mapping are lost
