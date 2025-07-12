@@ -230,11 +230,11 @@ After the program break is increased, the process can access addresses in the ne
 
 ```
 Field	Meaning
-VmPeak	Peak virtual memory size (maximum VmSize reached)
-VmSize	Current total virtual memory size (all mapped regions)
+VmPeak	Peak virtual memory size (maximum VmSize reached) (The maximum amount of virtual memory this process has used at any time)
+VmSize	Current total virtual memory size (all mapped regions) (This is the current total size of the process's virtual memory.)
 VmLck	Locked memory size (pages locked in RAM, not swappable)
 VmPin	Pinned memory size (pages that can't be moved, e.g., for DMA)
-VmHWM	Peak resident set size ("high water mark" of VmRSS)
+VmHWM	Peak resident set size ("high water mark" of VmRSS) (The maximum value of VmRSS (resident set size) that your process has ever reached during its lifetime.)
 VmRSS	Resident Set Size (actual physical memory currently in RAM)
 VmData	Size of data segment (heap + uninitialized data, i.e., malloc/brk/sbrk)
 VmStk	Stack size
@@ -312,10 +312,12 @@ There are four types of mapping can be created
 1. **private file mapping**:
 
     The content of the mapping initilized from a file, multiple process mapping the sane file initially share the same physical pages, later copy-on-write is employed and changes are not visible to other process
+    [private_file_mapping](./mmap/private_file_mapping.c)
 
 2. **Private anonymous mapping**:
 
     It creates a distant memory for the process, when subprocess is created using `fork` copy-on-write ensure's changes made by one process is not visible to other. It's conent are initilized to 0
+    [mmap](./mmap/mmap.c)
 
 3. **shared file mapping**:
 
@@ -323,12 +325,14 @@ There are four types of mapping can be created
     It's uses 
     - memory-mapped IO (File is loaded into a region of the process virtual memory and modifications are automatically written to the file). It is the alternative for `read` and `write`
     - Inter Process Communication for two unrelated process
+    [shared_file_mapping.c](./mmap/shared_file_mapping.c)
 
 4. **shared anonymous mapping**:
 
     It creates a distant memory, when a child process is created using fork it will not employ copy-on-write. The changes made by one process is visible to other
     It's used
     -Inter Process Communication for two related process 
+    [shared_anon_mapping.c](./mmap/shared_anon_mapping.c)
 
 ### Memory protection for mmap
 These are the page protection flags
@@ -350,7 +354,135 @@ All the process mapping are unmapped when process terminates or performs an `exe
 
 To ensure the cotent of the shared file mapping are written to the underlying file, a call to `msync()` should be made before munmap
 
-### program
-[mmap](./mmap.c)
 
 When a process executes `exec()` mapping are lost
+
+
+
+
+📅 Week 2: mmap(), mprotect(), and File Mapping
+| Focus                        | Topics Covered                           |
+| ---------------------------- | ---------------------------------------- |
+| ✅ mmap()                     | Anonymous, file-backed, shared/private   |
+munmap()
+| ✅ mprotect()                 | Set RWX on memory    (MAP_PRIVATE, MAP_SHARED, etc.)                     |
+| ✅ Access violation & SIGSEGV | Trigger, handle, debug                   |
+| ✅ Page fault theory          | Demand paging, page faults               |
+| ✅ Tools                      | `strace`, `objdump -h`, `/proc/PID/maps` |
+Mini Projects
+
+Map a text file to memory with mmap(), read and modify
+
+Modify it with MAP_SHARED and observe persistence
+
+Show copy-on-write with MAP_PRIVATE
+
+Show mprotect() usage and trigger SIGSEGV
+
+📅 Week 3: ELF Internals & Executable Memory Mapping
+| Focus                        | Topics Covered                                             |
+| ---------------------------- | ---------------------------------------------------------- |
+| ✅ ELF binary layout          | Sections vs Segments (`.text`, `.data`, `.bss`, `.rodata`) |
+| ✅ Use `readelf`, `objdump`   | Program headers (for loader), section headers (for linker) |
+| ✅ ELF → Memory mapping       | How ELF segments are mapped into memory via `mmap()`       |
+| ✅ Linker/Loader basics       | Dynamic linker, PT\_INTERP, ld.so, GOT/PLT                 |
+| ✅ Static vs dynamic binaries | Analyze with `ldd`, `readelf -d`, `objdump -R`             |
+Mini Projects
+
+Load a small ELF manually using mmap() (read-only)
+
+Trace program startup using strace and LD_DEBUG
+
+Compare static vs dynamic executable size & startup
+
+📅 Week 4: Advanced Topics: Demand Paging, Lazy Mapping, Real-Time SIGSEGV Handling
+| Focus                         | Topics Covered                                              |
+| ----------------------------- | ----------------------------------------------------------- |
+| ✅ Demand mapping via SIGSEGV  | Setup `sigaction()` with `SA_SIGINFO`                       |
+| ✅ Manual memory loading       | Allocate empty region, `mprotect`, on SIGSEGV load contents |
+| ✅ Reentrant-safe signal usage | Handler safety, `sig_atomic_t`, async-signal-safe functions |
+| ✅ Shared memory (intro only)  | Use of `mmap()` with `MAP_SHARED`, not `shmget` yet         |
+
+Mini Projects
+
+Custom loader: Allocate memory and load text file on-demand when SIGSEGV occurs
+
+Dynamically grow stack on access
+
+Watch memory behavior with /proc/self/smaps, and memory pressure with vmstat
+
+ Bonus / Optional (Add if time remains):
+🔸 brk() vs mmap() memory allocation
+
+🔸 Heap growth via sbrk() — legacy but useful to understand
+
+🔸 Implement mini malloc with mmap()
+
+🔸 Read /proc/PID/smaps and estimate RSS, shared/private memory
+
+🔸 Understand huge pages (THP)
+
+🧩 1. Process Memory Layout
+
+
+Identify regions: file-backed vs anonymous
+
+What is ELF’s role in memory mapping
+
+
+🔍 3. mmap() Internals
+What mmap() does at the system level:
+
+File-backed memory mapping (e.g. .so, images)
+
+Anonymous memory mapping (heap-like regions)
+
+Flags & Protections:
+
+MAP_SHARED vs MAP_PRIVATE (COW behavior)
+
+PROT_READ, PROT_WRITE, PROT_EXEC, PROT_NONE
+
+Mapping partial files, aligned memory
+
+munmap() to free memory manually
+
+🧪 4. Memory Protection (mprotect)
+How to mark memory regions read-only or inaccessible
+
+Catching segmentation faults with SIGSEGV
+
+Guard pages, memory corruption protection
+
+Security: exploit mitigation via memory protection
+
+🔁 5. Copy-on-Write Behavior
+How fork() and mmap(MAP_PRIVATE) use COW
+
+Detecting when a page gets copied (via strace, /proc)
+
+Use cases: performance optimization, snapshotting
+
+⚠️ 6. Segmentation Fault Debugging
+
+Accessing read-only or unmapped memory
+
+Recognize common memory corruption symptoms
+
+🧬 7. Advanced Concepts
+Memory-mapped I/O (e.g. /dev/mem)
+
+Allocating large pages (MAP_HUGETLB)
+
+Locking memory in RAM (mlock())
+
+Creating executable memory regions (JIT)
+
+🛠 8. Practical Debugging Tools
+strace, pmap, vmstat, top, valgrind
+
+Use perf or page-fault counters
+
+Understand how memory leaks or fragmentation happen
+
+Address Space Layout Randomization (ASLR) 
