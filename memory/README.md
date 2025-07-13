@@ -251,6 +251,100 @@ brk -> Sets the program break to location specified by end_data_seg, Since virtu
 sbrk -> Moves the program break by a specified increment. sbrk(0) returns the current location of the program break.
 sbrk(0) will return current location of program break
 
+To know more about mapping region levels `cat /proc/self/smaps`
+```
+Size 
+    Total size of the virtual memory region (not necessarily resident).
+    Always a multiple of page size (typically 4 KB).
+    Includes any extra padding due to page alignment.
+
+KernelPageSize
+    Actual software page size used
+
+MMUPageSize
+    Actual hardware page size used
+
+Rss (Resident Set Size)
+    Amount of this region currently in physical RAM.
+    Pages not accessed yet or swapped out will not be counted here.
+
+Pss (Proportional Set Size)
+    Private memory + (Shared memory / number of sharing processes)
+
+Pss_Dirty
+    Proportional part of dirty pages (pages modified) from this region.
+
+Shared_Clean / Shared_Dirty
+    Memory shared with other processes.
+    Clean = not modified since loaded.
+    Dirty = modified.
+
+Private_Clean / Private_Dirty
+    Private memory — only this process uses it.
+    Clean = not modified since loaded.
+    Dirty = modified (important for things like Copy-On-Write).
+
+Referenced
+    How much of this memory has been recently accessed (read or written).
+    The kernel clears this periodically to track active pages.
+
+Anonymous
+    Memory not backed by a file — like heap, stack, or MAP_ANONYMOUS.
+
+KSM (Kernel Samepage Merging)
+    Pages that were merged using Kernel Samepage Merging (KSM).
+    Mainly for VMs or deduplicated pages.
+
+LazyFree
+    Pages marked with MADV_FREE — kernel can reclaim if under memory pressure.
+    Used by applications like jemalloc.
+
+AnonHugePages
+    Portion of anonymous memory backed by huge pages (e.g., 2MB pages).
+    Speeds up access and reduces TLB pressure.
+
+ShmemPmdMapped / FilePmdMapped
+    Amount of shared memory or file-backed memory using PMD-sized huge pages (2MB).
+
+Shared_Hugetlb / Private_Hugetlb
+    Pages using the explicit hugetlbfs interface (very large pages).
+    Requires special kernel config & mount.
+
+Swap / SwapPss
+    Swap = how much of this region is currently swapped out.
+    SwapPss = proportional share (if shared) of swapped memory.
+
+Locked
+    Memory locked into RAM using mlock() or similar.
+    Not swappable.
+
+THPeligible
+    Indicates whether Transparent Huge Pages are allowed.
+    1 = eligible, 0 = not eligible.
+
+ProtectionKey
+    Memory protection key assigned (used in systems with Intel PKU).
+
+VmFlags
+
+    | Flag | Meaning                                                |
+    | ---- | ------------------------------------------------------ |
+    | `rd` | Readable                                               |
+    | `wr` | Writable                                               |
+    | `ex` | Executable                                             |
+    | `mr` | May read                                               |
+    | `mw` | May write                                              |
+    | `me` | May execute                                            |
+    | `ac` | Accounted (included in RSS)                            |
+    | `sd` | Soft-dirty (page was written to since last checkpoint) |
+    | `sh` | Shared mapping                                         |
+    | `pr` | Private mapping                                        |
+    | `dd` | Don't dump (excluded from core dumps)                  |
+    | `mm` | Mixed map (shared/private mix)                         |
+
+
+```
+
 ### malloca and free
 
 #### malloc
@@ -357,7 +451,9 @@ To ensure the cotent of the shared file mapping are written to the underlying fi
 
 When a process executes `exec()` mapping are lost
 
-
+// todo
+virtual address supposed to be same at all times of same program execution?
+i have written to shared and private, why private's dirty only 8kb not the shared one?
 
 
 📅 Week 2: mmap(), mprotect(), and File Mapping
