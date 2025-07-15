@@ -428,6 +428,10 @@ There are four types of mapping can be created
     -Inter Process Communication for two related process 
     [shared_anon_mapping.c](./mmap/shared_anon_mapping.c)
 
+> [!TIP]  
+> 1. Private anonymous pages: Kernel eagerly allocates zero pages on first access  
+> 2. Shared anonymous pages: Kernel delays allocation until actual data write  
+
 ### Memory protection for mmap
 These are the page protection flags
 `PORT_NONE` - The resgion is not accessed.  
