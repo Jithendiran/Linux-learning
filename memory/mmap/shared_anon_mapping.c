@@ -596,7 +596,7 @@ This is a page-level operation — only the page that is written gets copied, no
 */
 
 /*
-Analysis
+Analysis (COW in action)
 
 sh-shared memory
 pri - private memory
@@ -644,7 +644,7 @@ p - 0x327169000         // same physical address as child
 
 pri
 v - 0x7b2adc729000
-p - 0x307b1e000       // due to private different address
+p - 0x307b1e000       // due to private, different address (COW)
 
 === Parent After child ===
 sh 

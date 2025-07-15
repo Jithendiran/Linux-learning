@@ -450,13 +450,58 @@ Memory protection can be changed using `mprotect()`
 During munmap, kernel removes any memory locks that the process holds for specified address range.
 All the process mapping are unmapped when process terminates or performs an `exec`
 
-To ensure the cotent of the shared file mapping are written to the underlying file, a call to `msync()` should be made before munmap
-
+To ensure the cotent of the shared file mapping are written to the underlying file, a call to `msync()` should be made before munmap  
 
 When a process executes `exec()` mapping are lost
 
+
+## ASLR 
+Address Space Layout Randomization (ALSR)  is a security feature used in modern operating systems (like Linux, Windows, macOS) to randomize the memory layout of processes each time they start.
+
+Check is ALSR enabled `cat /proc/sys/kernel/randomize_va_space`
+
+| Value | Meaning                                |
+| ----- | -------------------------------------- |
+| 0     | ASLR is **disabled**                   |
+| 1     | ASLR is **partially enabled** (legacy) |
+| 2     | ASLR is **fully enabled** (default)    |
+
+### What will be randomized  
+
+| Region                           | Randomized? | Note                                                         |
+| -------------------------------- | ----------- | ------------------------------------------------------------ |
+| **Stack**                        | ✅           | Stack address changes per run.                               |
+| **Heap**                         | ✅           | Address returned by `brk()` or `mmap()` is randomized.       |
+| **Shared libraries**             | ✅           | e.g., libc base address changes per run.                     |
+| **Memory-mapped files (`mmap`)** | ✅           | `mmap` without `MAP_FIXED` will be randomized.               |
+| **Executable (PIE)**             | ✅ (if PIE)  | Normal executables aren't randomized unless compiled as PIE. |
+
+ASLR for Executables: PIE vs non-PIE
+* Non-PIE executables (default for older compilers): fixed base address (ASLR doesn't affect them).
+* PIE (Position Independent Executable): Fully relocatable → can be randomized!
+
+To check if your program is PIE: `readelf -h ./a.out | grep 'Type:'`
+```
+EXEC = not PIE
+DYN = PIE (position independent)
+```
+How to build PIE programs (for full ASLR support): `gcc -fPIE -pie your_program.c -o your_program`
+
+### Debugging
+* ASLR can make debugging annoying since addresses change every run.
+* You can disable it during debugging to get repeatable results. `set disable-randomization on  # inside GDB`
+
+### Diable ALSR
+1. 
+To disable ASLR temporarily: `sudo sysctl -w kernel.randomize_va_space=0`
+To permanently disable: 
+    Edit file `/etc/sysctl.conf` add this line `kernel.randomize_va_space = 0`
+
+2. This is not valid if `kernel.randomize_va_space` is enabled
+Compile a program without ALSR `gcc -no-pie your_program.c -o no_aslr_program`
+    `readelf -h ./a.out | grep 'Type:'` -> EXEC, not DYN 
+
 // todo
-virtual address supposed to be same at all times of same program execution?
 i have written to shared and private, why private's dirty only 8kb not the shared one?
 
 
