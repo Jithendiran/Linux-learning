@@ -454,6 +454,27 @@ To ensure the cotent of the shared file mapping are written to the underlying fi
 
 When a process executes `exec()` mapping are lost
 
+### Memory-Mapped I/O (File Mapping & Shared Memory)
+Memory-mapped I/O provides advantages over traditional file read()/write() operations.  
+In regular file I/O: `Data flows from the file -> kernel buffer -> user buffer` (two buffer involved).
+With memory-mapped I/O: `File -> memory region`. The same buffer is shared between the kernel and user space, which reduces memory copying and can improve performance.
+Moreover, when multiple processes map the same file using MAP_SHARED, they share the same physical memory region, reducing memory usage and enabling inter-process communication (IPC) efficiently.
+
+
+### Boundry case
+**Case 1: Mapping Within File Bounds**
+
+In may case the size of the mapping is same as the page size and mapping falls entirely with in the bounds of the mapped file. However this is not necessary.
+When a actual file size is 0 - 9499 bytes, we are mapping only 0 - 5999 bytes to the mapped region. Since 6000 is not multiply of 4096, it is rounded up to the next multiply of the system page size(8192 if 4096 is page size). Since file is large so remaining 6000 to 8191 also mapped. Attempt to access beyond 8191 will be `SIGSEGV`.  
+![mmap_l](./res/mmap_l.png)  
+Even though you asked for only 6000 bytes, the system maps a full page (or pages) for alignment.
+
+**Case 2: Mapping Beyond File Size (Partial File Mapping)**
+
+When the mapping beyound the underlying file, things are complex. 
+Suppose actual file size is only (0-2199 bytes) but we are mapping (0 - 8191 bytes). For the file the mapping in the memory are (0 - 2199 bytes are actual file content), since 2199 is not multiply of 4096, so the mapping region will be extended to 4095, since 2200 - 4095 is not available in file and but mapped because of page size boundry, the content of the these region (2200-4095) will be initilized to 0, writing to these region will not be reflected to underlying file. Region beyond 4095 (4096 - 8191 bytes) are mapped to memory but no content are available, access to these region will be `SIGBUS`, access beyond 8191 will be `SIGSEGV` 
+![mmap_s](./res/mmap_s.png)
+
 
 ## ASLR 
 Address Space Layout Randomization (ALSR)  is a security feature used in modern operating systems (like Linux, Windows, macOS) to randomize the memory layout of processes each time they start.
