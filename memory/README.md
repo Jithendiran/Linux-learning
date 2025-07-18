@@ -475,6 +475,59 @@ When the mapping beyound the underlying file, things are complex.
 Suppose actual file size is only (0-2199 bytes) but we are mapping (0 - 8191 bytes). For the file the mapping in the memory are (0 - 2199 bytes are actual file content), since 2199 is not multiply of 4096, so the mapping region will be extended to 4095, since 2200 - 4095 is not available in file and but mapped because of page size boundry, the content of the these region (2200-4095) will be initilized to 0, writing to these region will not be reflected to underlying file. Region beyond 4095 (4096 - 8191 bytes) are mapped to memory but no content are available, access to these region will be `SIGBUS`, access beyond 8191 will be `SIGSEGV` 
 ![mmap_s](./res/mmap_s.png)
 
+## MSYNC
+Force synchronization between a memory‑mapped region (created with mmap()) and its underlying storage (usually a file). This is primarily meaningful for MAP_SHARED mappings. For MAP_PRIVATE mappings, your modifications live in private copy‑on‑write pages and are not written back to the file by `msync()`.
+
+### Flag
+
+**M_SYNC**
+
+This is synchronous operation, if this flag is mentioned msync() system call will be blocked till thw content are written to file.
+
+**M_ASYNC**
+
+This performs a asynchronous file write, modified region will be written to the kernel buffer but disk updation at some later point
+
+**MS_INVALIDATE**
+
+* If mapped memory region has dirty pages, they are written back to the files
+* All memory pages that are inconsistent with the file on disk are marked as invalid in the page cache.
+* If another process modified the file directly (e.g., using write() or pwrite()), the mapped pages in your process might be stale. After MS_INVALIDATE, those pages will be discarded and fetched again from disk when next accessed. After invalidation, the next read from the mapping will cause the page to fault in fresh data from the file.
+
+```c
+// Process A
+int fd = open("data.txt", O_RDWR);
+char *map = mmap(NULL, 4096, PROT_READ|PROT_WRITE, MAP_SHARED, fd, 0);
+strcpy(map, "Hello"); // modifies mapping
+
+// Process B
+write(fd, "WORLD", 5); // modifies file directly
+
+// Back in Process A, map still sees "Hello" (old data)
+msync(map, 4096, MS_INVALIDATE);
+// Now, mapping reflects "WORLD" after reloading from file
+
+```
+
+## mmap vs malloc
+Both are used to allocate memory at run time. But they work very differently.
+
+### malloc
+* User-space library function (in glibc) for dynamic memory allocation.
+* It allocate memory in heap
+* For small allocations (≤128KB typically): Uses brk()/sbrk() to extend the program's heap segment.
+* It can be fragmented
+
+### mmap
+* A systemcall which directly map file or annonyms memory directly into process virtual memory
+* It's is not a part of heap.
+* Very large allocations (>128KB)
+* Memory is page aligned
+
+Both malloc() and mmap() allocate virtual address space, not physical memory immediately.
+
+### malloc use mmap
+Using malloc when trying to allocte large amount of memory, internally it will be using mmap
 
 ## ASLR 
 Address Space Layout Randomization (ALSR)  is a security feature used in modern operating systems (like Linux, Windows, macOS) to randomize the memory layout of processes each time they start.
@@ -524,35 +577,32 @@ Compile a program without ALSR `gcc -no-pie your_program.c -o no_aslr_program`
 
 // todo
 i have written to shared and private, why private's dirty only 8kb not the shared one?
+## Debugging
+* for malloc strace, ltrace, kernel debug
+* mmap strace, ltrace, kernel debug
+* elf strace, ltrace, kernel debug 
 
 
 📅 Week 2: mmap(), mprotect(), and File Mapping
 | Focus                        | Topics Covered                           |
 | ---------------------------- | ---------------------------------------- |
-| ✅ mmap()                     | Anonymous, file-backed, shared/private   |
+|  mmap()                     | Anonymous, file-backed, shared/private   |
 munmap()
-| ✅ mprotect()                 | Set RWX on memory    (MAP_PRIVATE, MAP_SHARED, etc.)                     |
-| ✅ Access violation & SIGSEGV | Trigger, handle, debug                   |
-| ✅ Page fault theory          | Demand paging, page faults               |
-| ✅ Tools                      | `strace`, `objdump -h`, `/proc/PID/maps` |
+|  Access violation & SIGSEGV | Trigger, handle, debug                   |
+|  Page fault theory          | Demand paging, page faults               |
+|  Tools                      | `strace`, `objdump -h`, `/proc/PID/maps` |
 Mini Projects
-
-Map a text file to memory with mmap(), read and modify
-
-Modify it with MAP_SHARED and observe persistence
-
-Show copy-on-write with MAP_PRIVATE
 
 Show mprotect() usage and trigger SIGSEGV
 
 📅 Week 3: ELF Internals & Executable Memory Mapping
 | Focus                        | Topics Covered                                             |
 | ---------------------------- | ---------------------------------------------------------- |
-| ✅ ELF binary layout          | Sections vs Segments (`.text`, `.data`, `.bss`, `.rodata`) |
-| ✅ Use `readelf`, `objdump`   | Program headers (for loader), section headers (for linker) |
-| ✅ ELF → Memory mapping       | How ELF segments are mapped into memory via `mmap()`       |
-| ✅ Linker/Loader basics       | Dynamic linker, PT\_INTERP, ld.so, GOT/PLT                 |
-| ✅ Static vs dynamic binaries | Analyze with `ldd`, `readelf -d`, `objdump -R`             |
+|  ELF binary layout          | Sections vs Segments (`.text`, `.data`, `.bss`, `.rodata`) |
+|  Use `readelf`, `objdump`   | Program headers (for loader), section headers (for linker) |
+|  ELF → Memory mapping       | How ELF segments are mapped into memory via `mmap()`       |
+|  Linker/Loader basics       | Dynamic linker, PT\_INTERP, ld.so, GOT/PLT                 |
+|  Static vs dynamic binaries | Analyze with `ldd`, `readelf -d`, `objdump -R`             |
 Mini Projects
 
 Load a small ELF manually using mmap() (read-only)
@@ -564,10 +614,10 @@ Compare static vs dynamic executable size & startup
 📅 Week 4: Advanced Topics: Demand Paging, Lazy Mapping, Real-Time SIGSEGV Handling
 | Focus                         | Topics Covered                                              |
 | ----------------------------- | ----------------------------------------------------------- |
-| ✅ Demand mapping via SIGSEGV  | Setup `sigaction()` with `SA_SIGINFO`                       |
-| ✅ Manual memory loading       | Allocate empty region, `mprotect`, on SIGSEGV load contents |
-| ✅ Reentrant-safe signal usage | Handler safety, `sig_atomic_t`, async-signal-safe functions |
-| ✅ Shared memory (intro only)  | Use of `mmap()` with `MAP_SHARED`, not `shmget` yet         |
+|  Demand mapping via SIGSEGV  | Setup `sigaction()` with `SA_SIGINFO`                       |
+|  Manual memory loading       | Allocate empty region, `mprotect`, on SIGSEGV load contents |
+|  Reentrant-safe signal usage | Handler safety, `sig_atomic_t`, async-signal-safe functions |
+|  Shared memory (intro only)  | Use of `mmap()` with `MAP_SHARED`, not `shmget` yet         |
 
 Mini Projects
 
@@ -590,7 +640,6 @@ Watch memory behavior with /proc/self/smaps, and memory pressure with vmstat
 
 🧩 1. Process Memory Layout
 
-
 Identify regions: file-backed vs anonymous
 
 What is ELF’s role in memory mapping
@@ -605,9 +654,6 @@ Anonymous memory mapping (heap-like regions)
 
 Flags & Protections:
 
-MAP_SHARED vs MAP_PRIVATE (COW behavior)
-
-PROT_READ, PROT_WRITE, PROT_EXEC, PROT_NONE
 
 Mapping partial files, aligned memory
 
@@ -623,15 +669,12 @@ Guard pages, memory corruption protection
 Security: exploit mitigation via memory protection
 
 🔁 5. Copy-on-Write Behavior
-How fork() and mmap(MAP_PRIVATE) use COW
 
 Detecting when a page gets copied (via strace, /proc)
 
 Use cases: performance optimization, snapshotting
 
 ⚠️ 6. Segmentation Fault Debugging
-
-Accessing read-only or unmapped memory
 
 Recognize common memory corruption symptoms
 
@@ -650,5 +693,3 @@ strace, pmap, vmstat, top, valgrind
 Use perf or page-fault counters
 
 Understand how memory leaks or fragmentation happen
-
-Address Space Layout Randomization (ASLR) 
