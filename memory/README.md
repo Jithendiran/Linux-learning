@@ -575,6 +575,9 @@ To permanently disable:
 Compile a program without ALSR `gcc -no-pie your_program.c -o no_aslr_program`
     `readelf -h ./a.out | grep 'Type:'` -> EXEC, not DYN 
 
+## Program
+[mprotect](./mmap/mprotect.c)
+
 // todo
 i have written to shared and private, why private's dirty only 8kb not the shared one?
 ## Debugging
@@ -586,14 +589,9 @@ i have written to shared and private, why private's dirty only 8kb not the share
 📅 Week 2: mmap(), mprotect(), and File Mapping
 | Focus                        | Topics Covered                           |
 | ---------------------------- | ---------------------------------------- |
-|  mmap()                     | Anonymous, file-backed, shared/private   |
-munmap()
-|  Access violation & SIGSEGV | Trigger, handle, debug                   |
-|  Page fault theory          | Demand paging, page faults               |
 |  Tools                      | `strace`, `objdump -h`, `/proc/PID/maps` |
 Mini Projects
 
-Show mprotect() usage and trigger SIGSEGV
 
 📅 Week 3: ELF Internals & Executable Memory Mapping
 | Focus                        | Topics Covered                                             |
