@@ -575,6 +575,29 @@ To permanently disable:
 Compile a program without ALSR `gcc -no-pie your_program.c -o no_aslr_program`
     `readelf -h ./a.out | grep 'Type:'` -> EXEC, not DYN 
 
+## mlock
+This `mlock()` system call will lock specified region in the physical memory, meaning it won't swapped out.  
+`mlockall()` system call will lock all the process memory,   
+`munlock()` system call will unlock specifed page  
+`munlockall()` system call will unlock all process memory
+
+To check how much memory is locked for a process `cat /proc/<PID>/status | grep VmLck`  
+To check how much memory is locked for a system wide `cat /proc/meminfo | grep Mlocked`
+
+### when it get's unlocked  
+1. Process exit/termination (automatic)
+2. Explicit unlock calls (munlock/munlockall)
+3. execve() - locks don't survive across exec
+4. Memory unmapping (munmap)
+5. System reboot
+
+### Shared Memory Locking:
+1. Each process must lock shared memory separately
+2. Locks don't transfer between processes
+3. Child processes get unlocked copies after fork(), lock is not inherited from parent
+4. Shared memory can be locked with mlock()
+
+
 ## Program
 [mprotect](./mmap/mprotect.c)
 
