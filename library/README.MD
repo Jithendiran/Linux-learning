@@ -1,5 +1,74 @@
 Library is a single unit of object, which will contains multiple binary files. It can be shared between programs thus reduce disk and RAM space
 
+## Stages of compilation & execution
+hello.c -> hello.i -> hello.s -> hello.o -> hello
+**1. Preprocessing**  
+- Expands macros, includes header files, and removes comments.
+- Produces a pure .i file with no preprocessor directives left.
+```
+gcc -E file.c -o file.i
+```
+**2. Compilation** 
+- The preprocessed code is converted into assembly code (.s) for the **target architecture.**
+- This includes parsing, semantic analysis, and generating optimized machine instructions.
+```
+gcc -S file.i -o file.s
+```
+**3. Assembly (as)**
+- The assembly code is converted into machine code (object file .o) by the assembler.
+- Still not executable — contains unresolved references to external functions like printf
+
+```
+gcc -c file.s -o file.o
+```
+
+**4. Linking (ld)**
+- Combines all object files (.o) and libraries (.a, .so) into a final executable.
+- Resolves symbol references (e.g., printf is linked to the correct function in libc).
+
+```
+gcc file.o -o file.out
+```
+
+------------ This is were our executable is produced
+
+**5.Loader**
+```
+./file.out
+```
+- The loader is a part of the operating system that loads an executable (like ELF) into memory and prepares it for execution.
+- It works after the linker and before the process starts running.
+
+### Task of Loader
+1. Parse the ELF headers
+- Read `.text`, `.data`, `.bss`, `.rodata`, etc.
+- Check which segments should be loaded into memory (via program headers like `PT_LOAD`).
+- Find the entry point (readelf -h a.out | grep Entry).
+
+2. Create the process memory image
+- Allocate virtual memory for: `.text`, `.data`, `.bss`, `stack` and `heap`
+- Load file backed pages
+
+3. Load Shared Libraries (Dynamic Linking)
+- If the executable depends on shared libraries, the loader invokes the dynamic linker (ld.so) to:
+* Find the libraries (e.g., /lib/x86_64-linux-gnu/libc.so.6).
+* Map them into the address space.
+* Fix up the PLT/GOT entries.
+
+4. Initialize runtime environment
+- Prepare argc, argv, and envp (environment variables).
+- Push them onto the stack.
+- Set up the auxiliary vector (used by the dynamic linker).
+
+5. Jump to the entry point
+- The CPU instruction pointer is set to _start (from the ELF header).
+- Execution begins.
+
+Trace loader operations:
+```
+LD_DEBUG=all ./a.out
+```
+
 > [!TIP]  
 > when compiling a library file or to execute linker manually use `-c` in `gcc`. It will not execute linker
 
@@ -92,3 +161,9 @@ The loader searches for libraries in this order:
 2. DT_RPATH / DT_RUNPATH in the executable (if set at link time using -Wl,-rpath).
 3. Cache: /etc/ld.so.cache (managed by ldconfig).
 4. System directories: /lib, /usr/lib, /lib64, etc.
+
+
+#### Naming conventions
+* realname
+* soname
+* linker name
