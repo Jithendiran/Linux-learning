@@ -209,3 +209,34 @@ Each section in an ELF file has a name — like .text, .data, .rodata, .bss, etc
 These names are not stored directly in the section header but rather as offsets into a string table (a blob of null-terminated strings).  
 It gives the index of the section that holds this string table.  
 If the file has no section name string table, this member holds the value SHN_UNDEF.
+
+## Section
+
+- **Section header table** tells us where each section is `(.text, .data. .bss,..)`
+- Each entry is an `Elf32_Shdr` (or `Elf64_Shdr` in 64-bit).
+- Table is an array of `Elf32_Shdr` or `Elf64_Shdr`
+
+### ELF Header
+- `e_shoff` Byte offset of the section header, to indicate where the header table is start
+- `e_shnum` Number of entries in the table
+- `e_shentsize` size of each entries in byte
+
+### Reserved section
+
+| Constant                     | Value               | Meaning                                                                                                |
+| ---------------------------- | ------------------- | ------------------------------------------------------------------------------------------------------ |
+| `SHN_UNDEF`                  | `0`                 | Symbol is **undefined**. This is common for symbols waiting to be resolved (e.g., external functions). |
+| `SHN_LORESERVE`              | `0xff00`            | Start of reserved range (for system use).                                                              |
+| `SHN_HIRESERVE`              | `0xffff`            | End of reserved range.                                                                                 |
+| `SHN_LOPROC` to `SHN_HIPROC` | `0xff00` – `0xff1f` | Reserved for processor-specific meanings.                                                              |
+| `SHN_ABS`                    | `0xfff1`            | Symbol has an **absolute value** — it's not relocated.  (Fixed location)                                                |
+| `SHN_COMMON`                 | `0xfff2`            | Symbol is in the **common block** (used in FORTRAN or C uninitialized global vars).                    |
+
+
+Sometimes, a symbol in the symbol table doesn’t live in a real section. These special constants help communicate:
+- "This symbol is external and not defined here" -> `SHN_UNDEF`
+- "This symbol's address is absolute and doesn't move" -> `SHN_ABS`
+- "This is unallocated common data" -> `SHN_COMMON`
+
+#### Program
+[section_header](./section_header.c)
