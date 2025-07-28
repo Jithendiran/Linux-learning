@@ -238,5 +238,87 @@ Sometimes, a symbol in the symbol table doesn’t live in a real section. These 
 - "This symbol's address is absolute and doesn't move" -> `SHN_ABS`
 - "This is unallocated common data" -> `SHN_COMMON`
 
+Section contains all information about object except ELF header, section header and program header
+
+- Every section in object should exactly have one section header
+- Sections in a file may not overlap
+- An object file may have inactive space
+
+### Header
+
+```c
+typedef struct {
+    Elf32_Word  sh_name;      // Index into section header string table (name of section)
+    Elf32_Word  sh_type;      // Type of section (code, data, symbol table, etc.)
+    Elf32_Word  sh_flags;     // Attributes (writable, executable, etc.)
+    Elf32_Addr  sh_addr;      // Virtual memory address when loaded, if no things to load then it's value will be 0
+    Elf32_Off   sh_offset;    // Offset in the file where this section starts
+    Elf32_Word  sh_size;      // Size of the section in bytes
+    Elf32_Word  sh_link;      // Link to another section (meaning depends on `sh_type`)
+    Elf32_Word  sh_info;      // Extra info (meaning depends on `sh_type`)
+    Elf32_Word  sh_addralign; // Required alignment (e.g. 4, 8, 16 bytes)
+    Elf32_Word  sh_entsize;   // Size of each entry (for sections with fixed-size entries)
+} Elf32_Shdr;
+
+```
+
+**sh_type** 
+What kind of section? (e.g., SHT_PROGBITS, SHT_SYMTAB, etc.)
+
+| **Name**       | **Value**    | **What it means (Simple explanation)**                                   |
+| -------------- | ------------ | ------------------------------------------------------------------------ |
+| `SHT_NULL`     | `0`          | Not used. Just a placeholder.                                            |
+| `SHT_PROGBITS` | `1`          | Program code or data (like `.text`, `.rodata`).                          |
+| `SHT_SYMTAB`   | `2`          | Full symbol table used by the linker (used in `readelf -s`).             |
+| `SHT_STRTAB`   | `3`          | String table (holds names of sections, symbols, etc.).                   |
+| `SHT_RELA`     | `4`          | Relocation entries (with extra number called *addend*). Used in x86\_64. |
+| `SHT_HASH`     | `5`          | Used for hashing symbols (for faster dynamic symbol lookup).             |
+| `SHT_DYNAMIC`  | `6`          | Info used by the dynamic linker at runtime (like which `.so` to load).   |
+| `SHT_NOTE`     | `7`          | Used for notes like ABI, build ID (e.g., `.note.ABI-tag`).               |
+| `SHT_NOBITS`   | `8`          | Takes up memory but no space in file (e.g., `.bss`).                     |
+| `SHT_REL`      | `9`          | Relocation entries (without *addend*). Used in 32-bit ELF.               |
+| `SHT_SHLIB`    | `10`         | Reserved. Almost never used.                                             |
+| `SHT_DYNSYM`   | `11`         | Smaller symbol table used at runtime (used for dynamic linking).         |
+| `SHT_LOPROC`   | `0x70000000` | Start of range for CPU-specific sections.                                |
+| `SHT_HIPROC`   | `0x7FFFFFFF` | End of CPU-specific section range.                                       |
+| `SHT_LOUSER`   | `0x80000000` | Start of range for user-defined (custom) sections.                       |
+| `SHT_HIUSER`   | `0xFFFFFFFF` | End of user-defined section range.                                       |
+
+* SHT_SYMTAB is for debugging/compiling
+SHT_SYMTAB is used for link editing  (what is link editing)
+
+| Property         | Description                                            |
+| ---------------- | ------------------------------------------------------ |
+| **Section Type** | `SHT_SYMTAB` (value = 2)                               |
+| **Purpose**      | Used by the linker during static linking               |
+| **Contents**     | All symbols: functions, variables, local/global/static |
+| **Size**         | Usually large                                          |
+| **Present in**   | Executables and object files (`.o`)                    |
+| **Stripped in**  | Final binaries (often stripped to reduce size)         |
+
+Use Case:
+
+- Used by compilers and linkers to resolve symbols
+- Example: Helps match int x = func(); with the actual definition of func()
+
+* SHT_DYNSYM is used for runtime.
+
+| Property         | Description                                                 |
+| ---------------- | ----------------------------------------------------------- |
+| **Section Type** | `SHT_DYNSYM` (value = 11)                                   |
+| **Purpose**      | Used by dynamic linker/loader at runtime                    |
+| **Contents**     | Only symbols needed for dynamic linking (e.g., shared libs) |
+| **Size**         | Smaller subset of `SHT_SYMTAB`                              |
+| **Present in**   | Shared libraries (`.so`) and dynamically linked executables |
+| **Retained in**  | Final binaries for runtime linking                          |
+
+Use Case:
+
+- Used by the dynamic loader (ld.so) to resolve functions like printf, malloc at runtime
+- Faster, smaller: doesn't contain unnecessary local/internal symbols
+
+* SHT_RELA and SHT_REL are used depending on architecture — x86_64 usually uses SHT_RELA.
+
+
 #### Program
 [section_header](./section_header.c)
