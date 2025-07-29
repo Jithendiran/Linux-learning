@@ -317,7 +317,19 @@ Use Case:
 - Used by the dynamic loader (ld.so) to resolve functions like printf, malloc at runtime
 - Faster, smaller: doesn't contain unnecessary local/internal symbols
 
-* SHT_RELA and SHT_REL are used depending on architecture — x86_64 usually uses SHT_RELA.
+
+* SHT_RELA
+
+- Relocation adjusts addresses in the binary when it's loaded into memory.
+- For example, if a function or variable is referenced before its exact address is known (e.g., external function), a relocation entry tells the linker or loader where and how to fix the address.
+- Architectures that require a separate addend value (like x86_64)
+
+| Feature             | `SHT_REL`                      | `SHT_RELA`                     |
+| ------------------- | ------------------------------ | ------------------------------ |
+| Addend stored where | In the section being relocated | In the relocation entry itself |
+| Struct used         | `Elf32_Rel` / `Elf64_Rel`      | `Elf32_Rela` / `Elf64_Rela`    |
+| Used by             | x86, ARM (mostly)              | x86\_64, PowerPC, etc.         |
+
 
 
 #### Program

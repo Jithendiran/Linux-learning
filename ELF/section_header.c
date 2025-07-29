@@ -23,7 +23,10 @@ int main() {
 }
 
 /**
- * readelf -s section_header_debug
+RESERVED SECTIONS
+---------------
+ 
+readelf -s section_header_debug
 Symbol table '.symtab' contains 18 entries:
    Num:    Value          Size Type    Bind   Vis      Ndx Name
      0: 0000000000000000     0 NOTYPE  LOCAL  DEFAULT  UND 
@@ -111,4 +114,133 @@ Key to Flags:
   L (link order), O (extra OS processing required), G (group), T (TLS),
   C (compressed), x (unknown), o (OS specific), E (exclude),
   D (mbind), l (large), p (processor specific)
+*/
+
+
+
+/*
+SYMBOL TABLE
+---------------
+
+gcc -g -O0 -no-pie -fcommon  -o section_header.o section_header.c
+readelf -s section_header.o
+
+Symbol table '.dynsym' contains 4 entries:
+   Num:    Value          Size Type    Bind   Vis      Ndx Name
+     0: 0000000000000000     0 NOTYPE  LOCAL  DEFAULT  UND 
+     1: 0000000000000000     0 FUNC    GLOBAL DEFAULT  UND _[...]@GLIBC_2.34 (2)
+     2: 0000000000000000     0 FUNC    GLOBAL DEFAULT  UND puts@GLIBC_2.2.5 (3)
+     3: 0000000000000000     0 NOTYPE  WEAK   DEFAULT  UND __gmon_start__
+
+Symbol table '.symtab' contains 40 entries:
+   Num:    Value          Size Type    Bind   Vis      Ndx Name
+     0: 0000000000000000     0 NOTYPE  LOCAL  DEFAULT  UND 
+     1: 0000000000000000     0 FILE    LOCAL  DEFAULT  ABS crt1.o
+     2: 000000000040038c    32 OBJECT  LOCAL  DEFAULT    4 __abi_tag
+     3: 0000000000000000     0 FILE    LOCAL  DEFAULT  ABS crtstuff.c
+     4: 0000000000401090     0 FUNC    LOCAL  DEFAULT   15 deregister_tm_clones
+     5: 00000000004010c0     0 FUNC    LOCAL  DEFAULT   15 register_tm_clones
+     6: 0000000000401100     0 FUNC    LOCAL  DEFAULT   15 __do_global_dtors_aux
+     7: 0000000000404038     1 OBJECT  LOCAL  DEFAULT   26 completed.0
+     8: 0000000000403e18     0 OBJECT  LOCAL  DEFAULT   21 __do_global_dtor[...]
+     9: 0000000000401130     0 FUNC    LOCAL  DEFAULT   15 frame_dummy
+    10: 0000000000403e10     0 OBJECT  LOCAL  DEFAULT   20 __frame_dummy_in[...]
+    11: 0000000000000000     0 FILE    LOCAL  DEFAULT  ABS section_header.c
+    12: 0000000000404034     4 OBJECT  LOCAL  DEFAULT   25 static_var
+    13: 0000000000000000     0 FILE    LOCAL  DEFAULT  ABS crtstuff.c
+    14: 0000000000402110     0 OBJECT  LOCAL  DEFAULT   19 __FRAME_END__
+    15: 0000000000000000     0 FILE    LOCAL  DEFAULT  ABS 
+    16: 0000000000403e20     0 OBJECT  LOCAL  DEFAULT   22 _DYNAMIC
+    17: 0000000000402014     0 NOTYPE  LOCAL  DEFAULT   18 __GNU_EH_FRAME_HDR
+    18: 0000000000404000     0 OBJECT  LOCAL  DEFAULT   24 _GLOBAL_OFFSET_TABLE_
+    19: 0000000000000000     0 FUNC    GLOBAL DEFAULT  UND __libc_start_mai[...]
+    20: 0000000000404020     0 NOTYPE  WEAK   DEFAULT   25 data_start
+    21: 0000000000000000     0 FUNC    GLOBAL DEFAULT  UND puts@GLIBC_2.2.5
+    22: 000000000040403c     4 OBJECT  GLOBAL DEFAULT   26 uninit_var
+    23: 0000000000404038     0 NOTYPE  GLOBAL DEFAULT   25 _edata
+    24: 000000000040116c     0 FUNC    GLOBAL HIDDEN    16 _fini
+    25: 0000000000404030     4 OBJECT  GLOBAL DEFAULT   25 global_var
+    26: 0000000000404020     0 NOTYPE  GLOBAL DEFAULT   25 __data_start
+    27: 0000000000000000     0 NOTYPE  WEAK   DEFAULT  UND __gmon_start__
+    28: 0000000000404028     0 OBJECT  GLOBAL HIDDEN    25 __dso_handle
+    29: 0000000000402000     4 OBJECT  GLOBAL DEFAULT   17 _IO_stdin_used
+    30: 0000000000401136    26 FUNC    GLOBAL DEFAULT   15 func
+    31: 0000000000404040     4 OBJECT  GLOBAL DEFAULT   26 comm
+    32: 0000000000404048     0 NOTYPE  GLOBAL DEFAULT   26 _end
+    33: 0000000000401080     5 FUNC    GLOBAL HIDDEN    15 _dl_relocate_sta[...]
+    34: 0000000000401050    38 FUNC    GLOBAL DEFAULT   15 _start
+    35: 0000000000404038     0 NOTYPE  GLOBAL DEFAULT   26 __bss_start
+    36: 0000000000401150    25 FUNC    GLOBAL DEFAULT   15 main
+    37: 0000000000402004     4 OBJECT  GLOBAL DEFAULT   17 const_val
+    38: 0000000000404038     0 OBJECT  GLOBAL HIDDEN    25 __TMC_END__
+    39: 0000000000401000     0 FUNC    GLOBAL HIDDEN    12 _init
+
+dynsym is produced by the linker and contains dynamic symbols that are used for dynamic linking at runtime.
+symtab is produced by the compiler and contains static symbols that are used for linking at compile time
+
+if -c flag is used, the compiler does not produce a dynamic symbol table, so the .dynsym section is not present.
+The .symtab section is still present, containing static symbols.
+*/
+
+
+/*
+RELOCATION
+---------------
+
+jidesh@jidesh-MS-7E26:/media/ssd/Project/Linux-learning/ELF$ gcc -g -O0 -no-pie -fcommon -c -o section_header_c.o section_header.c
+jidesh@jidesh-MS-7E26:/media/ssd/Project/Linux-learning/ELF$ readelf -r section_header_c.o
+
+Relocation section '.rela.text' at offset 0x718 contains 3 entries:
+  Offset          Info           Type           Sym. Value    Sym. Name + Addend
+00000000000b  000400000002 R_X86_64_PC32     0000000000000000 .rodata + 0
+000000000013  001000000004 R_X86_64_PLT32    0000000000000000 puts - 4
+000000000028  000f00000004 R_X86_64_PLT32    0000000000000000 func - 4
+
+Relocation section '.rela.debug_info' at offset 0x760 contains 28 entries:
+  Offset          Info           Type           Sym. Value    Sym. Name + Addend
+000000000008  00070000000a R_X86_64_32       0000000000000000 .debug_abbrev + 0
+00000000000d  00090000000a R_X86_64_32       0000000000000000 .debug_str + 6c
+000000000012  000a0000000a R_X86_64_32       0000000000000000 .debug_line_str + 0
+000000000016  000a0000000a R_X86_64_32       0000000000000000 .debug_line_str + 11
+00000000001a  000200000001 R_X86_64_64       0000000000000000 .text + 0
+00000000002a  00080000000a R_X86_64_32       0000000000000000 .debug_line + 0
+000000000031  00090000000a R_X86_64_32       0000000000000000 .debug_str + 2e
+000000000038  00090000000a R_X86_64_32       0000000000000000 .debug_str + 0
+00000000003f  00090000000a R_X86_64_32       0000000000000000 .debug_str + 45
+000000000046  00090000000a R_X86_64_32       0000000000000000 .debug_str + 107
+00000000004d  00090000000a R_X86_64_32       0000000000000000 .debug_str + 18
+000000000054  00090000000a R_X86_64_32       0000000000000000 .debug_str + 124
+000000000067  00090000000a R_X86_64_32       0000000000000000 .debug_str + 63
+00000000006e  00090000000a R_X86_64_32       0000000000000000 .debug_str + 40
+000000000073  00090000000a R_X86_64_32       0000000000000000 .debug_str + 11a
+00000000007f  000b00000001 R_X86_64_64       0000000000000004 comm + 0
+000000000088  00090000000a R_X86_64_32       0000000000000000 .debug_str + 58
+000000000094  000c00000001 R_X86_64_64       0000000000000000 global_var + 0
+00000000009d  00090000000a R_X86_64_32       0000000000000000 .debug_str + 24
+0000000000a9  000d00000001 R_X86_64_64       0000000000000000 const_val + 0
+0000000000b2  00090000000a R_X86_64_32       0000000000000000 .debug_str + 12e
+0000000000bf  000300000001 R_X86_64_64       0000000000000000 .data + 4
+0000000000c8  00090000000a R_X86_64_32       0000000000000000 .debug_str + d
+0000000000d4  000e00000001 R_X86_64_64       0000000000000004 uninit_var + 0
+0000000000dd  00090000000a R_X86_64_32       0000000000000000 .debug_str + 53
+0000000000e8  000200000001 R_X86_64_64       0000000000000000 .text + 1a
+0000000000fb  00090000000a R_X86_64_32       0000000000000000 .debug_str + 11f
+000000000102  000200000001 R_X86_64_64       0000000000000000 .text + 0
+
+Relocation section '.rela.debug_aranges' at offset 0xa00 contains 2 entries:
+  Offset          Info           Type           Sym. Value    Sym. Name + Addend
+000000000006  00060000000a R_X86_64_32       0000000000000000 .debug_info + 0
+000000000010  000200000001 R_X86_64_64       0000000000000000 .text + 0
+
+Relocation section '.rela.debug_line' at offset 0xa30 contains 4 entries:
+  Offset          Info           Type           Sym. Value    Sym. Name + Addend
+000000000022  000a0000000a R_X86_64_32       0000000000000000 .debug_line_str + 37
+00000000002c  000a0000000a R_X86_64_32       0000000000000000 .debug_line_str + 5d
+000000000031  000a0000000a R_X86_64_32       0000000000000000 .debug_line_str + 6e
+00000000003b  000200000001 R_X86_64_64       0000000000000000 .text + 0
+
+Relocation section '.rela.eh_frame' at offset 0xa90 contains 2 entries:
+  Offset          Info           Type           Sym. Value    Sym. Name + Addend
+000000000020  000200000002 R_X86_64_PC32     0000000000000000 .text + 0
+000000000040  000200000002 R_X86_64_PC32     0000000000000000 .text + 1a
 */
