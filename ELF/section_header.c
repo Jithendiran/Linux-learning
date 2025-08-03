@@ -48,6 +48,7 @@ Symbol table '.symtab' contains 18 entries:
     16: 0000000000000000     0 NOTYPE  GLOBAL DEFAULT  UND puts            -> symbol not defined in this file, so it is marked as undefined
     17: 000000000000001a    25 FUNC    GLOBAL DEFAULT    1 main
 
+-------------------------------------------------------------------
 Ndx
 UND -> `SHN_UNDEF`
 ABS -> `SHN_ABS`
@@ -57,7 +58,7 @@ ABS -> `SHN_ABS`
 COM -> `SHN_COMMON`
 
 1,2.. -> hese are indexes into the Section Header Table, which you can see using: `readelf -S section_header_debug` in [Nr]
-
+--------------------------------------------------------------------
 There are 23 section headers, starting at offset 0xb98:
 
 Section Headers:
@@ -243,4 +244,17 @@ Relocation section '.rela.eh_frame' at offset 0xa90 contains 2 entries:
   Offset          Info           Type           Sym. Value    Sym. Name + Addend
 000000000020  000200000002 R_X86_64_PC32     0000000000000000 .text + 0
 000000000040  000200000002 R_X86_64_PC32     0000000000000000 .text + 1a
+
+
+-------------------------------------------------------------------------------------
+jidesh@jidesh-MS-7E26:/media/ssd/Project/Linux-learning/ELF$ readelf -r section_header.o
+
+Relocation section '.rela.dyn' at offset 0x4b0 contains 2 entries:
+  Offset          Info           Type           Sym. Value    Sym. Name + Addend
+000000403ff0  000100000006 R_X86_64_GLOB_DAT 0000000000000000 __libc_start_main@GLIBC_2.34 + 0
+000000403ff8  000300000006 R_X86_64_GLOB_DAT 0000000000000000 __gmon_start__ + 0
+
+Relocation section '.rela.plt' at offset 0x4e0 contains 1 entry:
+  Offset          Info           Type           Sym. Value    Sym. Name + Addend
+000000404018  000200000007 R_X86_64_JUMP_SLO 0000000000000000 puts@GLIBC_2.2.5 + 0
 */

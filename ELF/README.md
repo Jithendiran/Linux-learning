@@ -221,29 +221,6 @@ If the file has no section name string table, this member holds the value SHN_UN
 - `e_shnum` Number of entries in the table
 - `e_shentsize` size of each entries in byte
 
-### Reserved section
-
-| Constant                     | Value               | Meaning                                                                                                |
-| ---------------------------- | ------------------- | ------------------------------------------------------------------------------------------------------ |
-| `SHN_UNDEF`                  | `0`                 | Symbol is **undefined**. This is common for symbols waiting to be resolved (e.g., external functions). |
-| `SHN_LORESERVE`              | `0xff00`            | Start of reserved range (for system use).                                                              |
-| `SHN_HIRESERVE`              | `0xffff`            | End of reserved range.                                                                                 |
-| `SHN_LOPROC` to `SHN_HIPROC` | `0xff00` – `0xff1f` | Reserved for processor-specific meanings.                                                              |
-| `SHN_ABS`                    | `0xfff1`            | Symbol has an **absolute value** — it's not relocated.  (Fixed location)                                                |
-| `SHN_COMMON`                 | `0xfff2`            | Symbol is in the **common block** (used in FORTRAN or C uninitialized global vars).                    |
-
-
-Sometimes, a symbol in the symbol table doesn’t live in a real section. These special constants help communicate:
-- "This symbol is external and not defined here" -> `SHN_UNDEF`
-- "This symbol's address is absolute and doesn't move" -> `SHN_ABS`
-- "This is unallocated common data" -> `SHN_COMMON`
-
-Section contains all information about object except ELF header, section header and program header
-
-- Every section in object should exactly have one section header
-- Sections in a file may not overlap
-- An object file may have inactive space
-
 ### Header
 
 ```c
@@ -287,6 +264,20 @@ What kind of section? (e.g., SHT_PROGBITS, SHT_SYMTAB, etc.)
 * SHT_SYMTAB is for debugging/compiling
 SHT_SYMTAB is used for link editing  (what is link editing)
 
+```c
+typedef struct {
+    Elf64_Word    st_name;   // Offset into .strtab for symbol name
+    unsigned char st_info;   // Type and Binding (Encodes symbol type (e.g., FUNC, OBJECT) and binding (e.g., GLOBAL, LOCAL, WEAK).)
+    unsigned char st_other;  // Visibility ( controls symbol visibility (DEFAULT, HIDDEN, etc.).)
+    Elf64_Half    st_shndx;  // Section index (e.g. .text, .data, SHN_UNDEF, etc.)
+    Elf64_Addr    st_value;  // Symbol's virtual address (if defined)
+    Elf64_Xword   st_size;   // Size of symbol (in bytes)
+} Elf64_Sym;
+```
+
+#### Symbol table
+Holds information needed to locate and relocate a program's symbolic reference definition and refrence 
+
 | Property         | Description                                            |
 | ---------------- | ------------------------------------------------------ |
 | **Section Type** | `SHT_SYMTAB` (value = 2)                               |
@@ -300,6 +291,30 @@ Use Case:
 
 - Used by compilers and linkers to resolve symbols
 - Example: Helps match int x = func(); with the actual definition of func()
+
+#### st_shndx
+
+| Constant                     | Value               | Meaning                                                                                                |
+| ---------------------------- | ------------------- | ------------------------------------------------------------------------------------------------------ |
+| `SHN_UNDEF`                  | `0`                 | Symbol is **undefined**. This is common for symbols waiting to be resolved (e.g., external functions). |
+| `SHN_LORESERVE`              | `0xff00`            | Start of reserved range (for system use).                                                              |
+| `SHN_HIRESERVE`              | `0xffff`            | End of reserved range.                                                                                 |
+| `SHN_LOPROC` to `SHN_HIPROC` | `0xff00` – `0xff1f` | Reserved for processor-specific meanings.                                                              |
+| `SHN_ABS`                    | `0xfff1`            | Symbol has an **absolute value** — it's not relocated.  (Fixed location)                                                |
+| `SHN_COMMON`                 | `0xfff2`            | Symbol is in the **common block** (used in FORTRAN or C uninitialized global vars).                    |
+
+
+Sometimes, a symbol in the symbol table doesn’t live in a real section. These special constants help communicate:
+- "This symbol is external and not defined here" -> `SHN_UNDEF`
+- "This symbol's address is absolute and doesn't move" -> `SHN_ABS`
+- "This is unallocated common data" -> `SHN_COMMON`
+
+Section contains all information about object except ELF header, section header and program header
+
+- Every section in object should exactly have one section header
+- Sections in a file may not overlap
+- An object file may have inactive space
+
 
 * SHT_DYNSYM is used for runtime.
 
