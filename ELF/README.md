@@ -315,6 +315,40 @@ Section contains all information about object except ELF header, section header 
 - Sections in a file may not overlap
 - An object file may have inactive space
 
+#### st_info
+
+```
+|Name          | Value |
+|--------------|-------| 
+|STB_LOCAL     |  0    |    
+|STB_GLOBAL    |  1    |
+|STB_WEAK      |  2    |
+|STB_LOPROC    |  13   |
+|STB_HIPROC    |  15   |
+```
+
+- `STB_LOCAL`
+
+    Not visible outside the object file, same name may exists in multiple files 
+
+- `STB_GLOBAL`
+
+    Global visible to program, There should be one definition
+
+- `STB_WEAK`
+
+    This does not cause a linker error if it’s missing, and can be overridden by a global (strong) symbol of the same name.
+
+- `STB_LOPROC` and `STB_HIPROC`  
+
+    Processor specific semantic 
+
+    [program](./weak_type.c), [program_2](./weak_global.c)
+
+Priority of binding
+1. STB_LOCAL
+2. STB_GLOBAL
+3. STB_WEAK
 
 * SHT_DYNSYM is used for runtime.
 
