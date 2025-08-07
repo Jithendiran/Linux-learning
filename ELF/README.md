@@ -105,7 +105,9 @@ Sections and segments have no specified order. Only the ELF header has a fixed p
 
 An ELF header resides at the beginning and holds a `road map` describing the file’s organization. 
 
-Sections hold the bulk of object file information for the linking view: instructions, data, symbol table, relocation information, and so on.
+- ELF Header: Contains metadata like file type, architecture, and entry point.
+- Program Headers (Segments): Define how to load the file into memory, specifying code and data areas.
+- Section Headers (Sections): Provide detailed information for linking and debugging, such as code, data, and symbol tables.
 
 ### Structure of header
 
