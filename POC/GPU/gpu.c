@@ -1,5 +1,5 @@
 // sudo apt install libpci-dev
-// gcc gpu.c -o /tmp/gpu.o && /tmp/gpu.o -lpci
+// gcc gpu.c -o /tmp/gpu.o -lpci && /tmp/gpu.o 
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -34,7 +34,7 @@ typedef struct
     * Memory clock /sys/class/drm/card1/device/pp_dpm_mclk
     */
     // General
-    int utilization_gfx_percent; // Graphics/Compute Utilization (%)
+    short utilization_gfx_percent; // Graphics/Compute Utilization (%)
     // /sys/class/drm/card1/device/gpu_busy_percent
     int power_watts;             // Power Consumption (W)
     // /sys/class/drm/card1/device/hwmon/hwmon2$ cat in0_input in1_input
@@ -48,28 +48,25 @@ typedef struct
     // Video Decoder Utilization (%)
     // // clock:  /sys/class/drm/card1/device/pp_dpm_dclk
     // overall_percent
+    // /sys/class/drm/card1/device/vcn_busy_percent
 
     // Frequency
     int core_clock_mhz; // Core/Shader Clock (MHz)
     // /sys/class/drm/card1/device/hwmon/hwmon2/freq1_input
     int mem_clock_mhz;  // Memory Clock (MHz)
     // /sys/class/drm/card1/device/pp_dpm_mclk
-    // /sys/class/drm/card1/device/vcn_busy_percent
 
     // VRAM
     int vram_total_mb;     // Total VRAM (MB)
     // /sys/class/drm/card1/device/mem_info_vram_total
     int vram_used_mb;      // Used VRAM (MB)
     // /sys/class/drm/card1/device/mem_info_vram_used
-    int vram_available_mb; // Available VRAM (MB)
 
     // Link & Driver
     char driver_used[64];      // e.g., "amdgpu" or "i915"
     char pcie_link_status[64]; // e.g., "x16 @ 8 GT/s"
     // /sys/class/drm/card1/device/current_link_speed, /sys/class/drm/card1/device/current_link_width
 
-    // Status/Error
-    char status_message[128]; // General status or last error
 } GpuMetrics;
 
 typedef struct
@@ -82,35 +79,31 @@ typedef struct
     GpuMetrics metrics;
 } GPUDevice;
 
-void print_metrics(const char *card_path, const GpuMetrics *metrics)
+void print_metrics(const GPUDevice *gpu)
 {
+    const GpuMetrics metrics = gpu->metrics;
+
     printf("\n======================================================\n");
-    printf("GPU Device: %s\n", card_path);
-    printf("Driver: %s | Link: %s\n", metrics->driver_used, metrics->pcie_link_status);
+    printf("GPU Device: %s\n", gpu->sys_path);
+    printf("Driver: %s | Link: %s\n", metrics.driver_used, metrics.pcie_link_status);
     printf("======================================================\n");
 
     printf("--- Utilization ---\n");
-    printf("  GFX/Compute: %d%%\n", metrics->utilization_gfx_percent);
-    printf("  Video Encoder/ Decoder:     %d%%\n", metrics->video_engine_percent);
+    printf("  GFX/Compute: %hd%%\n", metrics.utilization_gfx_percent);
+    printf("  Video Encoder/ Decoder:     %d%%\n", metrics.video_engine_percent);
 
     printf("--- Clocks & Power ---\n");
-    printf("  Core Clock:  %d MHz\n", metrics->core_clock_mhz);
-    printf("  Memory Clock: %d MHz\n", metrics->mem_clock_mhz);
-    printf("  Power Draw:  %d W\n", metrics->power_watts);
-    printf("  Temperature: %d °C\n", metrics->temperature_celsius);
+    printf("  Core Clock:  %d MHz\n", metrics.core_clock_mhz);
+    printf("  Memory Clock: %d MHz\n", metrics.mem_clock_mhz);
+    printf("  Power Draw:  %d W\n", metrics.power_watts);
+    printf("  Temperature: %d °C\n", metrics.temperature_celsius);
 
     printf("--- VRAM ---\n");
-    printf("  Total:       %d MB\n", metrics->vram_total_mb);
-    printf("  Used:        %d MB\n", metrics->vram_used_mb);
-    printf("  Available:   %d MB\n", metrics->vram_available_mb);
-
-    printf("--- Status ---\n");
-    printf("  Message: %s\n", metrics->status_message);
+    printf("  Total:       %d B\n", metrics.vram_total_mb);
+    printf("  Used:        %d B\n", metrics.vram_used_mb);
 }
 
 /**
- * @brief Reads the PCI vendor ID from the given file path.
- * @return unsigned short The vendor ID, or 0 on failure.
  * cat /usr/share/hwdata/pci.ids
  */
 unsigned short get_vendor_id(const char *vendor_file_path)
@@ -174,10 +167,61 @@ void get_dev_name(struct pci_access *pacc, char *buffer, int size, const unsigne
                     ven_id, dev_id);
 }
 
-void read_amd_metrics(GPUDevice device){
+/*----------------S---READ GPU--------------------------*/
+
+char get_gpu_busy_percentage(char *sys_path, void * buff){
+    char tmp[256];
+    snprintf(tmp, 256, "%s%s", sys_path, "/gpu_busy_percent");
+    FILE *fp;
+    fp = fopen(tmp, "r");
+    if (fp == NULL)
+        return 0;
+    char res = fscanf(fp, "%hd", (short *)buff);
+    return res == 1 ?  1 :  0;
+}
+
+char get_video_engine_percentage(char *sys_path, void * buff) {
+    char tmp[256];
+    snprintf(tmp, 256, "%s%s", sys_path, "/vcn_busy_percent");
+    FILE *fp;
+    fp = fopen(tmp, "r");
+    if (fp == NULL)
+        return 0;
+    char res = fscanf(fp, "%hd", (short *)buff);
+    return res == 1 ?  1 :  0;
+}
+
+char get_vram_total(char *sys_path, void * buff) {
+    char tmp[256];
+    snprintf(tmp, 256, "%s%s", sys_path, "/mem_info_vram_total");
+    FILE *fp;
+    fp = fopen(tmp, "r");
+    if (fp == NULL)
+        return 0;
+    char res = fscanf(fp, "%d", (int *)buff);
+    return res == 1 ?  1 :  0;
+}
+
+char get_vram_used(char *sys_path, void * buff) {
+    char tmp[256];
+    snprintf(tmp, 256, "%s%s", sys_path, "/mem_info_vram_used");
+    FILE *fp;
+    fp = fopen(tmp, "r");
+    if (fp == NULL)
+        return 0;
+    char res = fscanf(fp, "%d", (int *)buff);
+    return res == 1 ?  1 :  0;
+}
+
+/*----------------E---READ GPU--------------------------*/
+
+void read_amd_metrics(GPUDevice * device){
     char path[256];
-     snprintf(path, sizeof(path), "%s%s", device.sys_path, DEVICE_PATH);
-     printf("Dir : %s\n", path);
+    snprintf(path, sizeof(path), "%s%s", device->sys_path, DEVICE_PATH);
+    get_gpu_busy_percentage(path, &(device->metrics.utilization_gfx_percent));
+    get_video_engine_percentage(path, &device->metrics.video_engine_percent);
+    get_vram_total(path, &device->metrics.vram_total_mb);
+    get_vram_used(path, &device->metrics.vram_used_mb);
 }
 
 int main()
@@ -242,9 +286,9 @@ int main()
                     printf("DEVICE id : %x\n", gpu_device[i].device_id);
                     get_dev_name(pacc, gpu_device[i].model_name, sizeof(gpu_device[i].model_name), gpu_device[i].vendor_id, gpu_device[i].device_id);
                     printf("DEVICE Name : %s\n", gpu_device[i].model_name);
-
-                    if(gpu_device[i].device_id == VENDOR_ID_AMD){
-
+                    if(gpu_device[i].vendor_id == VENDOR_ID_AMD){
+                        read_amd_metrics(&gpu_device[i]);
+                        print_metrics(&(gpu_device[i]));
                     }
                     i++;
                 }
