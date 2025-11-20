@@ -1,10 +1,13 @@
 # Process 
+
+[cred](./creds.md)
+
 * fork()
 * exit()
 * wait()
 * copy-on-write (COW)
 
-## 🧠 What I Learned
+## What I Learned
 - How `fork()` creates a child process (cloning)
 - Why `wait()` is needed (zombies, orphan)
 - When to use `exit()` vs `_exit()`
@@ -147,7 +150,7 @@ To terminate a process *exit(stats)* or *_exit(status)* is used
 >[!TIP]  
 >**raw** termination: skips cleanup
 
-1. 🧪 Example 1: `exec()` in child, use `_exit()` if it fails
+1. Example 1: `exec()` in child, use `_exit()` if it fails
 ```c
 pid_t pid = fork();
 if (pid == 0) {
@@ -168,12 +171,12 @@ if (pid == 0) {
 	// Child process
 	printf("Child PID: %d\n", getpid());
 	// here no exec() calls are used so exit(0) can be used
-	exit(0);  // ✅ Child should exit
+	exit(0);  // Child should exit
 } else {
 	// Parent process
 	wait(NULL);  // Wait for child to finish
 	printf("Parent PID: %d\n", getpid());
-	exit(0);  // ✅ Parent should also exit
+	exit(0);  // Parent should also exit
 }
 ```
 
