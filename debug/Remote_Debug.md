@@ -87,7 +87,7 @@ GDB requires **four distinct pieces of information** to provide a useful debuggi
 │  GDB must find the actual .c/.h files to display them.  │
 │  Source: Source code on the host machine.               │
 ├─────────────────────────────────────────────────────────┤
-│  Requirement 4: SHARED LIBRARY DEBUG INFO               │
+│  Requirement 4: SHARED LIBRARY DEBUG INFO  (Optional)   │
 │  GDB must also resolve addresses inside libc, libpthread│
 │  etc. Those libraries must also be findable.            │
 │  Source: The target's root filesystem (sysroot).        │
@@ -105,11 +105,11 @@ Every GDB remote debugging problem is a failure to satisfy one or more of these 
 A program goes through these stages, each on a potentially different machine:
 
 ```
-Stage A: SOURCE WRITTEN on Host
+Stage A: SOURCE on Host
   File: /tmp/debug-learn/src/main.c
 
-        │
-        ▼ (cross-compilation or compilation)
+        │ (Purpose: Only for debugging)
+        ▼ (Shared to build machine/or build machine cloned same version separately)
 
 Stage B: BINARY COMPILED on Build Machine
   File: /module/dev/src/main.c  ← compiler records THIS path inside debug info
@@ -120,6 +120,74 @@ Stage B: BINARY COMPILED on Build Machine
 
 Stage C: BINARY RUNS on Target (QEMU)
   File: /apps/debug/debug-demo  ← this is the stripped version
+```
+
+### Build Machine prepare
+
+**Host Machine Configuration**
+1. Create Directories: Create a source and build folder on the host filesystem.
+    > `mkdir -p /tmp/debug-learn/src && mkdir -p /tmp/debug-learn/build`
+
+2.  Download Image: Obtain the Alpine Linux Virtual ISO.
+    > `cd /tmp` && `wget https://dl-cdn.alpinelinux.org/alpine/latest-stable/releases/x86_64/alpine-virt-3.23.4-x86_64.iso`
+
+**Build Machine Execution**
+1. **Launch QEMU:(Host)**
+    ```bash
+    qemu-system-x86_64 \
+    -enable-kvm \
+    -m 1G \
+    -drive file=alpine-virt-3.23.4-x86_64.iso,media=cdrom \
+    -boot d \
+    -nographic \
+    -netdev user,id=net0 -device virtio-net-pci,netdev=net0 \
+    -fsdev local,id=src_dev,path=/tmp/debug-learn,security_model=none \
+    -device virtio-9p-pci,fsdev=src_dev,mount_tag=host_share
+    ```
+    *   **`-fsdev`**: Defines a new filesystem device to the Qemu VM. 
+        *   **`local`**: Use the local filesystem driver. othet options (`handle` better for race condition, `proxy`: Runs the filesystem driver in a separate process)
+        *   **`id=src_dev`**: Assigns a unique identifier for new file system.
+        *   **`path=/tmp/debug-learn`**: Specifies the actual directory on the host machine to share.
+        *   **`security_model=none`**: This tells QEMU how to handle file permissions (UID/GID). `none` (or `passthrough`) is common for testing; it means the guest can access files based on the host's permissions.
+    *   **`-device virtio-9p-pci`**: Adds a virtual hardware device (a PCI controller) to the guest machine so it can "see" the shared folder.
+        *   **`fsdev=src_dev`**: Links this virtual hardware to the backend defined above.
+        *   **`mount_tag=host_share`**: Creates a label or "tag" for the guest (VM) operating system. The guest kernel uses this tag to identify which share to mount.
+
+2. **Inside QEMU Guest:**
+    * **Mount Shared Volume:**
+    ```bash
+    $ `mkdir -p /module/dev`
+    $ `mount -t 9p -o trans=virtio host_share /module/dev`
+    ```
+    The command `mount -t 9p -o trans=virtio host_share /module/dev` performs the following:
+
+    *   **`-t <file_system>`**: Specifies the filesystem type as Plan 9.
+    *   **`-o trans=virtio`**: Sets the transport method. It instructs the guest kernel to use the high-performance VirtIO drivers to move data between the guest and host.
+    *   **`host_share`**: Refers to the `mount_tag` defined in the QEMU launch command. This tells the kernel which host directory to access.
+    *   **`/module/dev`**: The local directory inside the guest where the host files will become visible.
+
+    **Download tools**
+    ```bash
+    $ setup-interfaces -a -r && setup-apkrepos -1
+    $ echo "http://dl-cdn.alpinelinux.org/alpine/v3.23/community" >> /etc/apk/repositories
+    $ apk update && apk add gcc-aarch64-none-elf binutils-aarch64-none-elf
+    ```
+
+## Target Machine prepare
+**Host machine prepare**
+```bash
+$ cd /tmp
+$ wget https://dl-cdn.alpinelinux.org/alpine/latest-stable/releases/aarch64/alpine-virt-3.23.4-aarch64.iso
+$ wget https://releases.linaro.org/components/kernel/uefi-linaro/16.02/release/qemu64/QEMU_EFI.fd 
+$ qemu-system-aarch64 \
+    -machine virt \
+    -cpu cortex-a57 \
+    -m 512 \
+    -bios /tmp/QEMU_EFI.fd \
+    -drive file=alpine-virt-3.23.4-aarch64.iso,media=cdrom \
+    -nographic \
+    -fsdev local,id=src_dev,path=/tmp/debug-learn/build,security_model=none \
+    -device virtio-9p-pci,fsdev=src_dev,mount_tag=host_share
 ```
 
 ### 3.2 The Path Embedding Problem
@@ -728,8 +796,7 @@ This program practices: breakpoints, stepping, printing variables, inspecting th
  * Concepts covered: break, next, step, print, backtrace, finish
  */
 
-#include 
-#include 
+#include <stdio.h>
 
 /* A simple structure to practice inspecting complex types */
 struct Rectangle {
@@ -1518,7 +1585,3 @@ list
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 ```
-
----
-
-*End of document. Version: 1.0. Covers: GDB remote debugging fundamentals, sysroot, substitute-path, solib-search-path, five sample programs with deliberate practice exercises.*
