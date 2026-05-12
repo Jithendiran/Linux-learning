@@ -5,9 +5,9 @@
 **Environment Used in This Document:**
 | Role | Machine | Relevant Path |
 |---|---|---|
-| **Target** | QEMU (the running program lives here) | `/apps/debug/debug-demo` |
-| **Build** | Where the binary was compiled | `/module/dev/src/...` |
-| **Host** | Where GDB runs / source code lives | `/tmp/debug-learn/src/...` |
+| **Target** | QEMU aarch64 (the running program lives here) | `/apps/debug/debug-demo` |
+| **Build** | QEMU x86_64 Where the binary was compiled | `/module/dev/src/...` |
+| **Debug** | x86_64 Where GDB runs / source code lives | `/tmp/debug-learn/src/...` |
 
 ---
 
@@ -63,7 +63,7 @@ Binary File (ELF)
 | **Debug build** | `gcc -g -o program program.c` | YES (`.debug_*`) | Large |
 | **Release/stripped build** | `gcc -O2 -o program program.c` then `strip program` | NO | Small |
 
-**Key fact about this environment:** The binary on the QEMU target (`/apps/debug/debug-demo`) is **stripped**. It has `.text` (machine code) but **no debug sections**. GDB running on the host machine cannot get debug information from this binary. This is the central problem that the tools in this document solve.
+**Key fact about this environment:** The binary on the QEMU target (`/apps/debug/debug-demo`) is **stripped**. It has `.text` (machine code) but **no debug sections**. GDB running on the debug machine cannot get debug information from this binary. This is the central problem that the tools in this document solve.
 
 ---
 
@@ -85,7 +85,7 @@ GDB requires **four distinct pieces of information** to provide a useful debuggi
 ├─────────────────────────────────────────────────────────┤
 │  Requirement 3: SOURCE FILES                            │
 │  GDB must find the actual .c/.h files to display them.  │
-│  Source: Source code on the host machine.               │
+│  Source: Source code on the debug machine.              │
 ├─────────────────────────────────────────────────────────┤
 │  Requirement 4: SHARED LIBRARY DEBUG INFO  (Optional)   │
 │  GDB must also resolve addresses inside libc, libpthread│
@@ -105,7 +105,7 @@ Every GDB remote debugging problem is a failure to satisfy one or more of these 
 A program goes through these stages, each on a potentially different machine:
 
 ```
-Stage A: SOURCE on Host
+Stage A: SOURCE on Debug
   File: /tmp/debug-learn/src/main.c
 
         │ (Purpose: Only for debugging)
@@ -170,7 +170,10 @@ Stage C: BINARY RUNS on Target (QEMU)
     ```bash
     $ setup-interfaces -a -r && setup-apkrepos -1
     $ echo "http://dl-cdn.alpinelinux.org/alpine/v3.23/community" >> /etc/apk/repositories
-    $ apk update && apk add gcc-aarch64-none-elf binutils-aarch64-none-elf
+    $ apk update
+    $ wget https://musl.cc/aarch64-linux-musl-cross.tgz
+    $ tar -xf aarch64-linux-musl-cross.tgz
+    $ aarch64-linux-musl-cross/bin/aarch64-linux-musl-gcc /module/dev/src/hello.c -o /module/dev/build/hello.o
     ```
 
 ## Target Machine prepare
@@ -186,8 +189,50 @@ $ qemu-system-aarch64 \
     -bios /tmp/QEMU_EFI.fd \
     -drive file=alpine-virt-3.23.4-aarch64.iso,media=cdrom \
     -nographic \
+    -netdev user,id=net0 -device virtio-net-pci,netdev=net0 \
     -fsdev local,id=src_dev,path=/tmp/debug-learn/build,security_model=none \
-    -device virtio-9p-pci,fsdev=src_dev,mount_tag=host_share
+    -device virtio-9p-pci,fsdev=src_dev,mount_tag=host_share \
+    -netdev socket,id=net1,listen=:1234 \
+    -device virtio-net-pci,netdev=net1,mac=52:54:00:12:34:10
+```
+**Qemu config**
+```bash
+$ mkdir -p /apps/debug/
+$ mount -t 9p -o trans=virtio host_share /apps/debug/
+$ setup-interfaces -a -r && setup-apkrepos -1
+$ echo "http://dl-cdn.alpinelinux.org/alpine/v3.23/community" >> /etc/apk/repositories
+$ apk update && apk add gdb
+$ ip addr add 192.168.10.1/24 dev eth1
+$ ip link set eth1 up
+$ gdbserver 192.168.10.1:1234 /apps/debug/hello.o
+```
+
+## Debug 
+**Host machine prepare**
+ ```bash
+$ qemu-system-x86_64 \
+-enable-kvm \
+-m 1G \
+-drive file=alpine-virt-3.23.4-x86_64.iso,media=cdrom \
+-boot d \
+-nographic \
+-netdev user,id=net0 -device virtio-net-pci,netdev=net0 \
+-fsdev local,id=src_dev,path=/tmp/debug-learn,security_model=none \
+-device virtio-9p-pci,fsdev=src_dev,mount_tag=host_share \
+-netdev socket,id=net1,connect=127.0.0.1:1234 \
+-device virtio-net-pci,netdev=net1,mac=52:54:00:12:34:11
+```
+
+**Qemu config**
+```bash
+$ mkdir -p /tmp/debug-learn/
+$ mount -t 9p -o trans=virtio host_share /tmp/debug-learn/
+$ setup-interfaces -a -r && setup-apkrepos -1
+$ echo "http://dl-cdn.alpinelinux.org/alpine/v3.23/community" >> /etc/apk/repositories
+$ apk update && apk add gdb-multiarch
+$ ip addr add 192.168.10.2/24 dev eth1
+$ ip link set eth1 up
+$ gdb-multiarch -ex "target remote 192.168.10.1:1234"
 ```
 
 ### 3.2 The Path Embedding Problem
@@ -200,7 +245,7 @@ When `gcc` compiles a file, it **records the absolute path of the source file in
 
 This path is **hardcoded at compile time** into the binary. It is the path on the **build machine** where compilation happened.
 
-**The problem:** When GDB runs on the **host machine**, it reads this path from the debug info and tries to open `/module/dev/src/main.c`. But on the host machine, the source is at `/tmp/debug-learn/src/main.c`. The path `/module/dev/src/main.c` does not exist on the host. GDB cannot find the source file and shows:
+**The problem:** When GDB runs on the **debug machine**, it reads this path from the debug info and tries to open `/module/dev/src/main.c`. But on the debug machine, the source is at `/tmp/debug-learn/src/main.c`. The path `/module/dev/src/main.c` does not exist on the debug. GDB cannot find the source file and shows:
 
 ```
 (gdb) list
@@ -219,7 +264,7 @@ Target filesystem:
   /lib/aarch64-linux-gnu/libpthread.so.0
 ```
 
-GDB on the host needs to load these same libraries to resolve addresses inside them. But the host machine's `/lib/` contains libraries for the **host architecture** (e.g., x86_64), not the target architecture (e.g., ARM/QEMU). Loading the wrong architecture libraries will fail or give wrong results.
+GDB on the debug needs to load these same libraries to resolve addresses inside them. But the debug machine's `/lib/` contains libraries for the **debug architecture** (e.g., x86_64), not the target architecture (e.g., ARM/QEMU). Loading the wrong architecture libraries will fail or give wrong results.
 
 This is **Problem 2: Shared Library Mismatch**.
 
@@ -235,20 +280,20 @@ Binaries deployed to embedded systems or production devices are stripped because
 - **Security**: Debug symbols expose internal function names, variable names, and structure layouts.
 - **Performance**: Loading large binaries takes more time.
 
-### 4.2 The Solution: Unstripped Binary on the Host
+### 4.2 The Solution: Unstripped Binary on the debug
 
 The standard workflow is:
 
 ```
 Build Machine produces TWO artifacts:
   1. debug-demo          (stripped) → deployed to target /apps/debug/debug-demo
-  2. debug-demo.debug    (unstripped, kept) → stays on build machine or copied to host
+  2. debug-demo.debug    (unstripped, kept) → stays on build machine or copied to debug
 ```
 
-GDB is started on the **host** and pointed at the **unstripped** binary. GDB uses that local file only for its debug sections. The actual execution happens on the target via gdbserver.
+GDB is started on the **debug** and pointed at the **unstripped** binary. GDB uses that local file only for its debug sections. The actual execution happens on the target via gdbserver.
 
 ```bash
-# On host, GDB loads the unstripped binary for debug info:
+# On debug, GDB loads the unstripped binary for debug info:
 gdb /path/to/unstripped/debug-demo
 
 # Then connects to gdbserver on QEMU:
@@ -290,9 +335,9 @@ Without the correct shared libraries, GDB shows:
 
 ### 5.3 The Library Architecture Problem
 
-The QEMU target might run an ARM binary. Its libc is compiled for ARM. The host machine runs x86_64. Its `/lib/` contains x86_64 libc. GDB must use the **target's** libc (ARM version), not the host's.
+The QEMU target might run an ARM binary. Its libc is compiled for ARM. The debug machine runs x86_64. Its `/lib/` contains x86_64 libc. GDB must use the **target's** libc (ARM version), not the debug's.
 
-This is why a copy of the target's entire library set must be made available to GDB on the host.
+This is why a copy of the target's entire library set must be made available to GDB on the debug.
 
 ### 5.4 Where Shared Libraries Live on the Target
 
@@ -305,7 +350,7 @@ Target (QEMU) filesystem:
   /lib64/                         ← 64-bit loader
 ```
 
-GDB needs access to all of these from the host.
+GDB needs access to all of these from the debug.
 
 ---
 
@@ -334,7 +379,7 @@ The dynamic linker is typically:
 
 ### 6.3 The Complete List of Automatically Downloaded Files
 
-| What is downloaded | From (target path) | Why | Where it lands on host |
+| What is downloaded | From (target path) | Why | Where it lands on debug |
 |---|---|---|---|
 | Dynamic linker | `/lib/ld-linux-*.so` | GDB needs it to find where libraries are mapped | Temp cache or sysroot |
 | Shared libraries | `/lib/libc.so.6`, etc. | To resolve addresses inside them | Temp cache or sysroot |
@@ -362,7 +407,7 @@ With `set sysroot` configured properly, GDB reads from that directory instead of
 
 ### 7.1 What sysroot Means
 
-**sysroot** = "system root". It is a **directory on the host machine that contains a copy of the target's entire filesystem** (or at least its library directories).
+**sysroot** = "system root". It is a **directory on the debug machine that contains a copy of the target's entire filesystem** (or at least its library directories).
 
 Conceptually, if the target's filesystem root is `/` and it contains:
 ```
@@ -371,7 +416,7 @@ Conceptually, if the target's filesystem root is `/` and it contains:
 /lib/ld-linux-aarch64.so.1
 ```
 
-Then the sysroot on the host is a directory, say `/opt/target-sysroot/`, that mirrors this:
+Then the sysroot on the debug is a directory, say `/opt/target-sysroot/`, that mirrors this:
 ```
 /opt/target-sysroot/lib/libc.so.6
 /opt/target-sysroot/usr/lib/libm.so.6
@@ -422,7 +467,7 @@ Both commands are identical. `solib-absolute-prefix` is the old name; `sysroot` 
 |---|---|
 | `set sysroot /some/path` | Use local directory as root of target filesystem |
 | `set sysroot remote:` | Tell GDB to download everything from target via gdbserver |
-| `set sysroot ""` | Disable sysroot; GDB uses host's `/` (dangerous for cross-debug) |
+| `set sysroot ""` | Disable sysroot; GDB uses debug's `/` (dangerous for cross-debug) |
 
 **`remote:` is a special protocol prefix.** It tells GDB: "the sysroot is the remote target itself." GDB will download files on demand. This is useful when no local copy of the target filesystem exists.
 
@@ -434,7 +479,7 @@ With `remote:`, when GDB needs `/lib/libc.so.6`, it downloads it from the target
 
 ### 7.6 How to Create a sysroot
 
-There are several methods to populate a sysroot directory on the host:
+There are several methods to populate a sysroot directory on the debug:
 
 **Method A: rsync from target**
 ```bash
@@ -459,11 +504,11 @@ No local preparation needed. GDB downloads what it needs on demand. Slower, but 
 
 `set sysroot` can be skipped (or left at default) when:
 
-1. **Debugging a native program**: GDB is on the same machine as the running process. The target's libraries ARE the host's libraries.
+1. **Debugging a native program**: GDB is on the same machine as the running process. The target's libraries ARE the debug's libraries.
 2. **Statically linked binary**: The binary contains all library code inside itself. No `.so` files are needed at all. (Check with: `file debug-demo` — if it says "statically linked", no sysroot needed.)
-3. **Only inspecting crashes (core dumps)** of host-architecture programs with host libraries.
+3. **Only inspecting crashes (core dumps)** of debug-architecture programs with debug libraries.
 
-For this environment (QEMU ARM target, GDB on host x86), **sysroot is required**.
+For this environment (QEMU ARM target, GDB on debug x86), **sysroot is required**.
 
 ---
 
@@ -475,7 +520,7 @@ For this environment (QEMU ARM target, GDB on host x86), **sysroot is required**
 
 Recall the problem:
 - Debug info inside the binary says source is at: `/module/dev/src/main.c`
-- Actual source on the host is at: `/tmp/debug-learn/src/main.c`
+- Actual source on the debug is at: `/tmp/debug-learn/src/main.c`
 
 `set substitute-path` tells GDB: "when looking for a file, replace the beginning of the path."
 
@@ -488,7 +533,7 @@ set substitute-path FROM TO
 | Parameter | Meaning |
 |---|---|
 | `FROM` | The path prefix as it appears inside the binary's debug info (the build machine path) |
-| `TO` | The actual path on the host machine where source files exist |
+| `TO` | The actual path on the debug machine where source files exist |
 
 **For this environment:**
 ```gdb
@@ -546,7 +591,7 @@ They are independent tools solving independent problems. Both may be needed simu
 
 `set substitute-path` can be skipped when:
 
-1. **Source is compiled in the same directory where GDB runs**: Paths embedded in debug info match the host paths exactly.
+1. **Source is compiled in the same directory where GDB runs**: Paths embedded in debug info match the debug paths exactly.
 2. **Using `set directories`**: An alternative (see below) that adds search paths without requiring exact prefix knowledge.
 3. **Source is irrelevant**: Only inspecting register values or memory, not stepping through code.
 
@@ -592,8 +637,8 @@ When GDB needs to find a shared library (e.g., `libc.so.6`), it searches in this
    → /opt/target-libs/libc.so.6
    → /opt/extra-libs/libc.so.6
 
-3. Host system paths (dangerous for cross-debug, may load wrong arch)
-   → /lib/libc.so.6  (this is the HOST's libc, wrong for cross-debug)
+3. Debug system paths (dangerous for cross-debug, may load wrong arch)
+   → /lib/libc.so.6  (this is the Debug's libc, wrong for cross-debug)
 
 4. Download from target via gdbserver (if sysroot is remote: or fallback)
 ```
@@ -610,7 +655,7 @@ When GDB needs to find a shared library (e.g., `libc.so.6`), it searches in this
 
 Use `solib-search-path` when:
 
-1. **No complete sysroot is available**, but specific library files have been manually copied to the host.
+1. **No complete sysroot is available**, but specific library files have been manually copied to the debug.
 2. **The sysroot is missing some libraries** (third-party `.so` files not in the standard path).
 3. **Debugging a proprietary library** that is kept separately from the main sysroot.
 
@@ -690,7 +735,7 @@ START: GDB connected to target but something is wrong
 ```
 Target (QEMU)     : running /apps/debug/debug-demo (stripped)
 Build machine     : compiled from /module/dev/src/
-Host machine      : GDB runs here, source at /tmp/debug-learn/src/
+Debug machine     : GDB runs here, source at /tmp/debug-learn/src/
 Unstripped binary : assumed available at /tmp/debug-learn/bin/debug-demo.debug
 Target IP         : 192.168.1.100 (example)
 gdbserver port    : 1234
@@ -711,10 +756,10 @@ Process /apps/debug/debug-demo created; pid = 1042
 Listening on port 1234
 ```
 
-### 11.3 Step 2 — Start GDB on Host
+### 11.3 Step 2 — Start GDB on debug
 
 ```bash
-# On the host machine, use the cross-debugger matching the target architecture:
+# On the debug machine, use the cross-debugger matching the target architecture:
 # For ARM target:
 aarch64-linux-gnu-gdb /tmp/debug-learn/bin/debug-demo.debug
 # OR if using a generic GDB with multi-arch support:
