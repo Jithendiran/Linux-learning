@@ -11,25 +11,6 @@
 
 ---
 
-## Table of Contents
-
-1. [Stage 1 — What a Binary Actually Contains](#stage-1--what-a-binary-actually-contains)
-2. [Stage 2 — What GDB Actually Needs to Debug](#stage-2--what-gdb-actually-needs-to-debug)
-3. [Stage 3 — The Three-Machine Problem](#stage-3--the-three-machine-problem)
-4. [Stage 4 — The Stripped Binary Problem](#stage-4--the-stripped-binary-problem)
-5. [Stage 5 — Shared Libraries: The Hidden Dependency](#stage-5--shared-libraries-the-hidden-dependency)
-6. [Stage 6 — What Gets Downloaded From the Remote Machine](#stage-6--what-gets-downloaded-from-the-remote-machine)
-7. [Stage 7 — sysroot: The Master Solution](#stage-7--sysroot-the-master-solution)
-8. [Stage 8 — set substitute-path: The Surgical Solution](#stage-8--set-substitute-path-the-surgical-solution)
-9. [Stage 9 — solib-search-path: The Manual Override](#stage-9--solib-search-path-the-manual-override)
-10. [Stage 10 — Decision Matrix: Which Tool to Use When](#stage-10--decision-matrix-which-tool-to-use-when)
-11. [Stage 11 — Complete Setup for This Environment](#stage-11--complete-setup-for-this-environment)
-12. [Stage 12 — Sample Programs for Deliberate Practice](#stage-12--sample-programs-for-deliberate-practice)
-13. [Stage 13 — Deliberate Practice Exercises](#stage-13--deliberate-practice-exercises)
-14. [Quick Reference Card](#quick-reference-card)
-
----
-
 ## Stage 1 — What a Binary Actually Contains
 
 Before understanding any GDB concept, it is essential to understand what a compiled binary file is made of.
@@ -800,347 +781,13 @@ gdb-multiarch /tmp/debug-learn/bin/debug-demo.debug
 (gdb) info functions
 ```
 
-### 11.6 Saving Configuration to a .gdbinit File
-
-Instead of typing these commands every session, save them to a `.gdbinit` file in the project directory:
-
-```gdb
-# File: /tmp/debug-learn/.gdbinit
-
-set sysroot /opt/target-sysroot
-set substitute-path /module/dev/src /tmp/debug-learn/src
-set solib-search-path /opt/extra-libs
-target remote 192.168.1.100:1234
-break main
-continue
-```
-
-Start GDB with this init file:
-```bash
-gdb -x /tmp/debug-learn/.gdbinit /tmp/debug-learn/bin/debug-demo.debug
-```
-
-Or GDB automatically loads `.gdbinit` from the current directory if `set auto-load safe-path` allows it.
-
 ---
 
 ## Stage 12 — Sample Programs for Deliberate Practice
 
 All programs are designed to be compiled on the build machine with debug info, stripped for deployment to the target, and debugged from the host.
 
-### 12.1 Program A — Fundamentals: Functions and Variables
-
-**File: `/module/dev/src/01_fundamentals.c`**
-
-This program practices: breakpoints, stepping, printing variables, inspecting the call stack.
-
-```c
-/*
- * Program: 01_fundamentals.c
- * Purpose: GDB basics — variables, functions, call stack
- * Concepts covered: break, next, step, print, backtrace, finish
- */
-
-#include <stdio.h>
-
-/* A simple structure to practice inspecting complex types */
-struct Rectangle {
-    int width;
-    int height;
-};
-
-/* Compute area. Practice: set breakpoint here, print arguments */
-int compute_area(struct Rectangle r) {
-    int area = r.width * r.height;
-    return area;
-}
-
-/* Compute perimeter. Practice: inspect 'r' fields individually */
-int compute_perimeter(struct Rectangle r) {
-    int perimeter = 2 * (r.width + r.height);
-    return perimeter;
-}
-
-/* Display function. Practice: step INTO this from main */
-void display_result(const char *label, int value) {
-    printf("%s: %d\n", label, value);
-}
-
-int main(void) {
-    /* Practice: break here, use 'next' to step through */
-    struct Rectangle rect;
-    rect.width  = 10;
-    rect.height = 5;
-
-    int area      = compute_area(rect);
-    int perimeter = compute_perimeter(rect);
-
-    display_result("Area",      area);
-    display_result("Perimeter", perimeter);
-
-    /* Practice: modify 'area' at runtime using:
-     *   (gdb) set variable area = 999
-     * Then continue and observe the changed output */
-
-    printf("Done.\n");
-    return 0;
-}
-```
-
-**Build commands:**
-```bash
-# On build machine, from /module/dev/src/
-# Unstripped (keep for GDB):
-gcc -g -O0 -o /module/dev/build/01_fundamentals.debug 01_fundamentals.c
-
-# Stripped (deploy to target):
-cp /module/dev/build/01_fundamentals.debug /module/dev/build/01_fundamentals
-strip /module/dev/build/01_fundamentals
-
-# Deploy stripped binary to target:
-scp /module/dev/build/01_fundamentals root@192.168.1.100:/apps/debug/
-
-# Copy unstripped binary to host for GDB:
-cp /module/dev/build/01_fundamentals.debug /tmp/debug-learn/bin/
-```
-
-**Practice exercises for this program:**
-
-```gdb
-(gdb) break main                    # Stop at entry of main
-(gdb) break compute_area            # Stop when compute_area is called
-(gdb) run                           # Start (or 'continue' after target remote)
-(gdb) next                          # Execute one line, don't enter functions
-(gdb) step                          # Execute one line, ENTER functions
-(gdb) print rect                    # Print the entire struct
-(gdb) print rect.width              # Print one field
-(gdb) print area                    # Print a variable
-(gdb) backtrace                     # Show call stack
-(gdb) frame 1                       # Switch to frame 1 (caller of current)
-(gdb) finish                        # Run until current function returns
-(gdb) set variable area = 999       # Modify a variable at runtime
-(gdb) continue                      # Resume execution
-```
-
----
-
-### 12.2 Program B — Pointers and Memory
-
-**File: `/module/dev/src/02_pointers.c`**
-
-This program practices: examining memory, pointer dereferencing, watching memory changes.
-
-```c
-/*
- * Program: 02_pointers.c
- * Purpose: Understand pointer behavior, memory layout, watchpoints
- * Concepts covered: examine (x), print *, watch, display
- */
-
-#include 
-#include 
-#include 
-
-#define BUFFER_SIZE 64
-
-/* Fills buffer with a repeated character */
-void fill_buffer(char *buf, int size, char ch) {
-    for (int i = 0; i < size - 1; i++) {
-        buf[i] = ch;
-    }
-    buf[size - 1] = '\0';
-}
-
-/* Reverses a string in-place */
-void reverse_string(char *str) {
-    int len = strlen(str);
-    int left  = 0;
-    int right = len - 1;
-    while (left < right) {
-        char temp  = str[left];
-        str[left]  = str[right];
-        str[right] = temp;
-        left++;
-        right--;
-    }
-}
-
-/* Dynamically allocates and returns an integer array */
-int *create_array(int size, int start_value) {
-    int *arr = malloc(size * sizeof(int));
-    if (arr == NULL) {
-        return NULL;
-    }
-    for (int i = 0; i < size; i++) {
-        arr[i] = start_value + i;
-    }
-    return arr;
-}
-
-int main(void) {
-    /* --- Section 1: Stack buffer ---
-     * Practice: examine raw memory with 'x' command */
-    char buffer[BUFFER_SIZE];
-    fill_buffer(buffer, BUFFER_SIZE, 'A');
-
-    /* Practice: x/64cb buffer   → examine 64 bytes as chars */
-    /* Practice: x/16xb buffer   → examine 16 bytes as hex   */
-
-    /* --- Section 2: Pointer arithmetic ---
-     * Practice: print ptr, print *ptr, print ptr[3] */
-    char *ptr = buffer;
-    ptr += 10;   /* advance pointer by 10 bytes */
-
-    /* --- Section 3: String reversal ---
-     * Practice: watch buffer  → GDB stops when buffer changes */
-    char word[16];
-    strncpy(word, "hello", sizeof(word));
-    reverse_string(word);
-
-    /* --- Section 4: Heap allocation ---
-     * Practice: print arr[0]@5 → print 5 elements from arr   */
-    int *arr = create_array(5, 100);
-    if (arr == NULL) {
-        fprintf(stderr, "Allocation failed\n");
-        return 1;
-    }
-
-    for (int i = 0; i < 5; i++) {
-        printf("arr[%d] = %d\n", i, arr[i]);
-    }
-
-    free(arr);
-    printf("buffer (first 10): %.10s\n", buffer);
-    printf("reversed word: %s\n", word);
-
-    return 0;
-}
-```
-
-**Key GDB commands to practice:**
-
-```gdb
-(gdb) break fill_buffer
-(gdb) continue
-(gdb) x/64cb buffer             # Examine 64 bytes as characters
-(gdb) x/16xb buffer             # Examine 16 bytes in hex
-
-(gdb) break reverse_string
-(gdb) continue
-(gdb) watch str[0]              # Stop whenever str[0] changes
-
-(gdb) break create_array
-(gdb) continue
-(gdb) next                      # Step through allocation
-(gdb) print arr                 # Print pointer address
-(gdb) print *arr                # Dereference: print first element
-(gdb) print arr[0]@5            # Print 5 elements starting at arr[0]
-(gdb) display arr[0]@5          # Auto-print these on every stop
-```
-
----
-
-### 12.3 Program C — Crash Analysis (Segfault)
-
-**File: `/module/dev/src/03_crash.c`**
-
-This program practices: post-crash analysis, core dumps, finding the root cause.
-
-```c
-/*
- * Program: 03_crash.c
- * Purpose: Deliberate crash for debugging practice.
- * Concepts covered: backtrace after crash, info locals, find root cause
- *
- * WARNING: This program INTENTIONALLY crashes. That is the point.
- */
-
-#include 
-#include 
-#include 
-
-typedef struct Node {
-    int value;
-    struct Node *next;
-} Node;
-
-/* Inserts a value into a linked list */
-Node *insert(Node *head, int value) {
-    Node *new_node = malloc(sizeof(Node));
-    new_node->value = value;
-    new_node->next  = head;
-    return new_node;
-}
-
-/* Sums all values — contains a deliberate bug:
- * Does not check for NULL before dereferencing */
-int sum_list(Node *head) {
-    int total = 0;
-    /* BUG: 'current' is never checked against NULL before access
-     * This causes a crash when the list is empty or a node is corrupt */
-    Node *current = head;
-    while (current->value != -1) {    /* BUG: crashes if current == NULL */
-        total   += current->value;
-        current  = current->next;
-    }
-    return total;
-}
-
-/* Processes data — calls sum_list with potentially bad input */
-int process_data(int *values, int count) {
-    Node *list = NULL;
-
-    for (int i = 0; i < count; i++) {
-        list = insert(list, values[i]);
-    }
-
-    /* BUG: The list has no -1 sentinel node.
-     * sum_list will walk past the end and dereference NULL. */
-    int result = sum_list(list);
-
-    /* Note: list is never freed — memory leak. Practice: find it. */
-    return result;
-}
-
-int main(void) {
-    int data[] = {10, 20, 30, 40, 50};
-    int count  = sizeof(data) / sizeof(data[0]);
-
-    printf("Processing %d values...\n", count);
-    int result = process_data(data, count);
-    printf("Result: %d\n", result);   /* This line will not be reached */
-
-    return 0;
-}
-```
-
-**Practice exercises:**
-
-```gdb
-# Run the program — it will crash
-(gdb) continue
-# Program received signal SIGSEGV, Segmentation fault.
-
-# Now investigate:
-(gdb) backtrace             # Which function crashed? At what line?
-(gdb) frame 0               # Go to crash frame
-(gdb) info locals           # What were the local variables?
-(gdb) print current         # Print the pointer that was NULL
-(gdb) frame 1               # Go one level up
-(gdb) info locals           # Inspect the caller's state
-(gdb) list                  # Show source around the crash point
-```
-
-**What the backtrace will show:**
-```
-#0  sum_list (head=0x...) at 03_crash.c:32     ← crash here
-#1  process_data (values=0x..., count=5) at 03_crash.c:52
-#2  main () at 03_crash.c:62
-```
-
----
-
-### 12.4 Program D — Shared Library Usage
+### Program  — Shared Library Usage
 
 **File: `/module/dev/src/04_shared_lib.c`**
 
@@ -1150,20 +797,16 @@ This program is specifically designed to practice `set sysroot` and `info shared
 /*
  * Program: 04_shared_lib.c
  * Purpose: Uses multiple shared libraries. Practice sysroot configuration.
- * Concepts covered: info sharedlibrary, stepping into library code,
- *                   understanding resolved vs. unresolved library addresses.
  */
 
-#include 
-#include 
-#include        /* libm — requires linking with -lm */
-#include 
-#include 
+#include <stdio.h>
+#include <stdlib.h>
+#include <math.h>    /* For sqrt() */
+#include <errno.h>   /* For errno */
+#include <string.h>  /* For strerror() */
 
 /* Computes hypotenuse using sqrt() from libm */
 double compute_hypotenuse(double a, double b) {
-    /* Practice: step into sqrt(). With correct sysroot/debug libs,
-     * GDB can show libm source. Without, it shows assembly. */
     double sum_squares = (a * a) + (b * b);
     double result = sqrt(sum_squares);
     return result;
@@ -1173,9 +816,6 @@ double compute_hypotenuse(double a, double b) {
 void *safe_malloc(size_t size) {
     void *ptr = malloc(size);
     if (ptr == NULL) {
-        /* Practice: when malloc fails, inspect errno:
-         *   (gdb) print errno
-         *   (gdb) call strerror(errno)   */
         fprintf(stderr, "malloc failed: %s\n", strerror(errno));
         exit(1);
     }
@@ -1190,7 +830,7 @@ int compare_ints(const void *a, const void *b) {
 int main(void) {
     /* Test 1: Math library */
     double h = compute_hypotenuse(3.0, 4.0);
-    printf("Hypotenuse(3, 4) = %.2f\n", h);   /* Expected: 5.00 */
+    printf("Hypotenuse(3, 4) = %.2f\n", h); 
 
     /* Test 2: Heap + sorting */
     int count = 6;
@@ -1213,7 +853,7 @@ int main(void) {
 
 **Build with math library:**
 ```bash
-gcc -g -O0 -o /module/dev/build/04_shared_lib.debug 04_shared_lib.c -lm
+aarch64-linux-musl-gcc -g -O0  04_shared_lib.c -o 04_shared_lib -lm
 cp /module/dev/build/04_shared_lib.debug /module/dev/build/04_shared_lib
 strip /module/dev/build/04_shared_lib
 ```
@@ -1233,140 +873,76 @@ strip /module/dev/build/04_shared_lib
 (gdb) call strerror(2)          # Calls strerror(ENOENT) from libc directly
 (gdb) call printf("from gdb\n") # Call printf directly
 ```
+## Cross-Debugging Shared Libraries with GDB
+
+### 1. Fundamental Concept: The Sysroot
+
+The **Sysroot** (System Root) is a directory on the host computer that mirrors the filesystem structure of the target device. In cross-platform development, the host (e.g., x86_64) and the target (e.g., AArch64) utilize different instruction sets and library binaries.
+
+**Purpose:**
+GDB requires access to target libraries to perform two critical tasks:
+
+* **Symbol Resolution:** Translating memory addresses into human-readable function names (e.g., `0x...08a0` into `sqrt`).
+* **Stack Unwinding:** Understanding how a function manages the stack to provide a backtrace (`bt`). Without the library's metadata, GDB cannot determine where one function call ends and another begins.
 
 ---
 
-### 12.5 Program E — Multi-threaded Program
+### 2. The Procedure Linkage Table (PLT)
 
-**File: `/module/dev/src/05_threads.c`**
+The **PLT** is a small jump-table residing within the executable binary. When a program calls a function in a shared library (like `sqrt` in `libm`), it does not jump to the library directly. Instead, it jumps to a "stub" in the PLT.
 
-```c
-/*
- * Program: 05_threads.c
- * Purpose: Multi-threaded debugging practice.
- * Concepts covered: info threads, thread N, break with thread condition,
- *                   detecting race conditions with GDB.
- */
+**Logical Flow:**
 
-#include 
-#include 
-#include 
-#include 
-
-#define NUM_THREADS 3
-#define ITERATIONS  5
-
-/* Shared counter — intentionally NOT protected by mutex.
- * This is a deliberate race condition for educational purposes. */
-static int shared_counter = 0;
-
-/* Protected counter with mutex for comparison */
-static int protected_counter = 0;
-static pthread_mutex_t counter_mutex = PTHREAD_MUTEX_INITIALIZER;
-
-typedef struct {
-    int thread_id;
-    int increment_by;
-} ThreadArgs;
-
-/* Worker function for unprotected counter */
-void *worker_unprotected(void *arg) {
-    ThreadArgs *args = (ThreadArgs *)arg;
-
-    for (int i = 0; i < ITERATIONS; i++) {
-        /* RACE CONDITION: read-modify-write is not atomic */
-        int current = shared_counter;           /* read  */
-        current += args->increment_by;           /* modify */
-        shared_counter = current;               /* write  */
-
-        /* Sleep to make race condition more visible */
-        usleep(1000);
-    }
-
-    printf("Thread %d finished. Incremented by %d, %d times.\n",
-           args->thread_id, args->increment_by, ITERATIONS);
-    return NULL;
-}
-
-/* Worker function for protected counter */
-void *worker_protected(void *arg) {
-    ThreadArgs *args = (ThreadArgs *)arg;
-
-    for (int i = 0; i < ITERATIONS; i++) {
-        pthread_mutex_lock(&counter_mutex);
-        protected_counter += args->increment_by;
-        pthread_mutex_unlock(&counter_mutex);
-        usleep(1000);
-    }
-
-    return NULL;
-}
-
-int main(void) {
-    pthread_t threads[NUM_THREADS];
-    ThreadArgs args[NUM_THREADS];
-
-    printf("Starting %d threads...\n", NUM_THREADS);
-
-    /* Launch unprotected threads */
-    for (int i = 0; i < NUM_THREADS; i++) {
-        args[i].thread_id    = i + 1;
-        args[i].increment_by = (i + 1) * 10;   /* 10, 20, 30 */
-        pthread_create(&threads[i], NULL, worker_unprotected, &args[i]);
-    }
-
-    for (int i = 0; i < NUM_THREADS; i++) {
-        pthread_join(threads[i], NULL);
-    }
-
-    /* Expected: (10+20+30) * 5 = 300
-     * Actual may differ due to race condition */
-    printf("Unprotected counter: %d (expected 300)\n", shared_counter);
-
-    /* Reset and test protected version */
-    for (int i = 0; i < NUM_THREADS; i++) {
-        pthread_create(&threads[i], NULL, worker_protected, &args[i]);
-    }
-
-    for (int i = 0; i < NUM_THREADS; i++) {
-        pthread_join(threads[i], NULL);
-    }
-
-    printf("Protected counter:   %d (expected 300)\n", protected_counter);
-
-    pthread_mutex_destroy(&counter_mutex);
-    return 0;
-}
-```
-
-**Build:**
-```bash
-gcc -g -O0 -o /module/dev/build/05_threads.debug 05_threads.c -lpthread
-```
-
-**Practice exercises:**
-```gdb
-(gdb) break worker_unprotected
-(gdb) continue
-
-# After hitting breakpoint:
-(gdb) info threads              # List all threads
-(gdb) thread 2                  # Switch to thread 2
-(gdb) backtrace                 # See thread 2's call stack
-
-# Set a breakpoint that triggers only in thread 3:
-(gdb) break worker_unprotected thread 3
-
-# Watch the shared variable:
-(gdb) watch shared_counter
-# GDB will stop every time shared_counter changes and show which thread changed it
-
-# Print thread-local variables:
-(gdb) thread apply all print args  # Print 'args' in all threads
-(gdb) thread apply all backtrace   # Backtrace all threads simultaneously
-```
+1. **The Call:** The main program calls the PLT stub.
+2. **The Resolution:** The stub checks if the address of the library function is already known.
+3. **The Jump:** If known, the stub branches to the library address in memory.
+4. **The Appearance in GDB:** While the CPU is executing the 3–4 instructions inside the PLT stub, GDB may display `?? ()`. This occurs because the stub is a machine-generated bridge and does not correspond to a specific line of source code.
 
 ---
+
+### 3. Absolute vs. Relative Symlinks in Toolchains
+
+In many Linux distributions, and specifically within the **Musl libc** ecosystem, the dynamic linker (`ld-musl-aarch64.so.1`) and the math library (`libm.so`) are often symlinks to the primary C library (`libc.so`).
+
+**The Problem with Absolute Symlinks:**
+A symlink pointing to `/lib/libc.so` is an **absolute path**. When GDB encounters this on a host machine, it attempts to follow the link to the host's own `/lib/` directory rather than staying within the designated `sysroot`. This leads to architecture mismatches or "file not found" errors.
+
+**The Solution:**
+Symlinks within a toolchain must be **relative**. By pointing `ld-musl-aarch64.so.1` to `libc.so` (without a leading slash), GDB is forced to resolve the file within the current `sysroot` directory.
+
+---
+
+### 4. Musl Libc Architectural Particularity
+
+Unlike **glibc**, which separates functionality into multiple files (`libc.so`, `libm.so`, `libdl.so`), **Musl libc** often consolidates these into a single shared object file.
+
+**Observation in GDB:**
+When debugging a Musl-based target, `info sharedlibrary` may only show one entry (the dynamic linker). This is normal behavior because that single file contains the code for standard C functions, math operations, and the dynamic loader itself.
+
+---
+
+### 5. GDB Configuration Commands
+
+| Command | Purpose |
+| --- | --- |
+| `set sysroot <path>` | Defines the local directory mimicking the target's root. GDB prepends this path to every library the target attempts to load. |
+| `set sysroot target:/` | Instructs GDB to download libraries directly from the remote device. This ensures version matching but is significantly slower than local access. |
+| `set solib-search-path <path>` | Provides a fallback directory for libraries. If the directory structure in the `sysroot` does not match the target exactly, GDB looks here. |
+| `info sharedlibrary` | Displays which libraries are loaded, their memory addresses, and whether symbols (`Syms Read`) were successfully loaded. |
+| `sharedlibrary` | Manually triggers GDB to attempt loading symbols for all currently mapped shared objects. |
+
+---
+
+### 6. Troubleshooting the "?? ()" in Backtraces
+
+If a backtrace displays `?? ()` or stops prematurely, the cause is typically a failure in library resolution.
+
+**Logic Check-list:**
+
+1. **Verify Sysroot:** Ensure `show sysroot` points to the directory containing the `lib/` folder.
+2. **Check Symlinks:** Ensure library files are not broken absolute links.
+3. **Step-In Execution:** Use `si` (Step Instruction) to move past the PLT stub. Once the Program Counter ($PC) enters the library memory space (often starting with `0xffff...`), GDB can associate the address with the library symbols.
+4. **Confirm Symbol Loading:** Use `info sharedlibrary`. If `Syms Read` is "No," GDB is ignoring the library, likely due to a path mismatch between the host and target.
 
 ## Stage 13 — Deliberate Practice Exercises
 
@@ -1387,87 +963,6 @@ Mastery requires progressive, isolated practice. Complete each stage before adva
 
 **Success criteria:** Source visible, libraries resolved, breakpoint works.
 
----
-
-### Stage 13.2 — Breakpoints and Stepping (Program A)
-
-**Isolated skill:** Control flow in GDB.
-
-| Command | What it does | When to use |
-|---|---|---|
-| `break LOCATION` | Set a breakpoint | Before running |
-| `continue` (c) | Resume until next break | After a break |
-| `next` (n) | Next line, stay in current function | Don't want to enter called functions |
-| `step` (s) | Next line, enter called functions | Want to trace into sub-functions |
-| `finish` | Run until current function returns | Inside a function, want to get back to caller |
-| `until LINE` | Run until specific line | Skip a loop quickly |
-
-**Exercise sequence:**
-```gdb
-break main
-continue
-next              ← observe: rect.width = 10 executes
-next              ← observe: rect.height = 5 executes
-step              ← observe: GDB enters compute_area()
-print r           ← confirm: r = {width=10, height=5}
-print r.width     ← confirm: $1 = 10
-finish            ← return to main
-print area        ← confirm: area = 50
-```
-
----
-
-### Stage 13.3 — Memory Inspection (Program B)
-
-**Isolated skill:** The `x` (examine) command.
-
-**Syntax:** `x/NFU ADDRESS`
-
-| Letter | Meaning | Options |
-|---|---|---|
-| N | Count (how many units) | Any integer |
-| F | Format | `x` (hex), `d` (decimal), `c` (char), `s` (string), `i` (instruction) |
-| U | Unit size | `b` (byte), `h` (halfword/2B), `w` (word/4B), `g` (giant/8B) |
-
-**Exercise sequence:**
-```gdb
-break fill_buffer
-continue
-finish                     ← let fill_buffer complete
-x/10cb buffer              ← examine 10 chars: should show 'A' ten times
-x/10xb buffer              ← same data in hex: 0x41 = 'A'
-x/1s  buffer               ← examine as string
-print &buffer              ← print address of buffer
-print sizeof(buffer)       ← print compile-time size
-```
-
----
-
-### Stage 13.4 — Crash Analysis (Program C)
-
-**Isolated skill:** Post-crash investigation.
-
-**Exercise sequence:**
-```gdb
-break main
-continue
-continue              ← let program run until crash
-                      ← SIGSEGV will occur
-
-backtrace             ← identify crash location
-frame 0               ← go to crash frame
-info locals           ← what variables exist here?
-print current         ← what is the bad pointer?
-
-frame 1               ← go to caller
-info locals           ← inspect caller's state
-list                  ← see source around the bug
-
-# Key question to answer: why is 'current' NULL?
-# Trace back: how was the list constructed? Did it end with a -1 sentinel?
-```
-
----
 
 ### Stage 13.5 — sysroot Verification Experiment
 
@@ -1539,81 +1034,6 @@ list
 ## Quick Reference Card
 
 ```
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
- GDB REMOTE DEBUGGING — QUICK REFERENCE
-
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
- STARTUP SEQUENCE
- ────────────────
- [target]  gdbserver :1234 /path/to/stripped-binary
- [host]    gdb-multiarch /path/to/unstripped-binary.debug
-
- CONFIGURATION (before 'target remote')
- ───────────────────────────────────────
- set sysroot /opt/target-sysroot       ← fix library paths
- set sysroot remote:                   ← download libs from target
- set substitute-path /build/src /host/src  ← fix source paths
- set solib-search-path /extra/libs     ← extra library search dirs
- set directories /host/src:$cdir:$cwd  ← alternative source search
-
- CONNECT
- ───────
- target remote HOST:PORT
-
- BREAKPOINTS
- ───────────
- break main                  break at function
- break file.c:42             break at file + line
- break *0x401234             break at address
- watch variable              stop when variable changes
- catch syscall               stop at system call
- info breakpoints            list all breakpoints
- delete N                    delete breakpoint N
-
- EXECUTION
- ─────────
- continue (c)                resume
- next (n)                    next line, no entry
- step (s)                    next line, with entry
- finish                      run to function return
- until LINE                  run to line
-
- INSPECTION
- ──────────
- print EXPR                  print value
- print *ptr                  dereference pointer
- print arr@N                 print N elements of array
- display EXPR                auto-print at every stop
- x/NFU ADDR                  examine raw memory
- info locals                 all local variables
- info args                   function arguments
- backtrace (bt)              call stack
- frame N                     switch to frame N
- info registers              all CPU registers
- info sharedlibrary          shared library status
-
- MODIFICATION
- ────────────
- set variable NAME = VAL     change a variable
- call FUNCTION(ARGS)         call any function
-
- THREADS
- ───────
- info threads                list threads
- thread N                    switch to thread N
- thread apply all bt         backtrace all threads
-
- DIAGNOSTICS
- ───────────
- show sysroot                current sysroot
- show substitute-path        active path rules
- info sharedlibrary          library load status
- maintenance info sections   all ELF sections
-
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
  WHICH TOOL SOLVES WHICH PROBLEM?
 
  "No source file for /build/path/main.c"
@@ -1628,5 +1048,7 @@ list
  "No symbol table is loaded" / "no debugging symbols"
    → GDB is loaded with stripped binary; use unstripped version
 
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+ Loaded all the symbol files but still it is showing `addr in ?? ()` then it might be inside `PLT` to find the where the current code is 
+ 1. run `bt` note down address of showing ??
+ 2. `info files` match the address between the range 
 ```
