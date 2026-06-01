@@ -57,6 +57,8 @@ Comparative Implementation Examples
 ## Why Sockets Exist (The Underlying Logic)
 The socket abstraction exists to solve three critical engineering challenges in operating system design: Hardware Abstraction, Protocol Multiplexing, and Memory Protection.
 
+Network packets are read and write using interface file descriptor, but configurations are only allowed in socket file descriptor, socket can receive data from all the interface. it can attach to specific level/layer/protocol from a kernel network subsystem
+
 **Hardware Abstraction**
 Network interface cards from different manufacturers use completely different hardware registers and control systems. Sockets isolate the software developer from hardware implementations. The application writes bytes to a file descriptor, and the kernel converts those bytes into hardware-specific operations.
 
