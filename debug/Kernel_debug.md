@@ -47,7 +47,7 @@ Operating systems require a root filesystem (/) to load files and execute progra
     // init.c
     #include <stdio.h>
     #include <unistd.h>
-
+    #include <fcntl.h>
     void main() {
         printf("Hello! I am the only program running on this computer.\n");
 
@@ -98,7 +98,13 @@ Operating systems require a root filesystem (/) to load files and execute progra
     CONFIG_DEBUG_INFO_DWARF_TOOLCHAIN_DEFAULT=y
     CONFIG_GDB_SCRIPTS=y
     CONFIG_RANDOMIZE_BASE=n
+    CONFIG_CC_OPTIMIZE_FOR_PERFORMANCE=n
+    CONFIG_CC_OPTIMIZE_FOR_DEBUGGING=y
     EOF
+    ```
+    ```bash
+    ./scripts/config --disable CONFIG_CC_OPTIMIZE_FOR_PERFORMANCE
+    ./scripts/config --enable CONFIG_CC_OPTIMIZE_FOR_DEBUGGING
     ```
 4. Sanitize and apply the new configuration options:
    ```bash
@@ -133,4 +139,45 @@ gdb /tmp/kernel/linux-6.1.60/vmlinux
 (gdb) target remote :1234
 (gdb) hbreak start_kernel
 (gdb) c
+```
+
+### Vscode
+```json
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "Linux Kernel Live Debug (QEMU)",
+            "type": "cppdbg",
+            "request": "launch",
+            // Points to the uncompressed binary containing DWARF symbols
+            "program": "/tmp/kernel/linux-6.1.60/vmlinux",
+            "args": [],
+            "stopAtEntry": false,
+            "cwd": "/tmp/kernel/linux-6.1.60",
+            "environment": [],
+            "externalConsole": false,
+            "MIMode": "gdb",
+            "miDebuggerPath": "/usr/bin/gdb",
+            // Connects to the QEMU backend server
+            "miDebuggerServerAddress": "localhost:1234",
+            "setupCommands": [
+                {
+                    "description": "Enable pretty-printing for gdb",
+                    "text": "-enable-pretty-printing",
+                    "ignoreFailures": true
+                },
+                {
+                    "description": "Load Linux kernel helper scripts",
+                    "text": "add-auto-load-safe-path /tmp/kernel/linux-6.1.60/vmlinux-gdb.py",
+                    "ignoreFailures": true
+                }
+            ],
+            // Source path mapping so VS Code can align the binary with your source code
+            "sourceFileMap": {
+                "/tmp/kernel/linux-6.1.60": "${workspaceFolder}/linux-6.1.60"
+            }
+        }
+    ]
+}
 ```
